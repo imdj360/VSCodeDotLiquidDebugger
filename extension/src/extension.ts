@@ -64,32 +64,25 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(`Created ${path.basename(inputPath)} — edit this as your template input.`);
     });
 
-    // Auto-refresh on document save
+    // Auto-refresh on document save — only for the panel's tracked template/input pair
     const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
         const cfg = vscode.workspace.getConfiguration('dotliquid');
         if (!cfg.get<boolean>('autoRefresh', true)) return;
         if (!previewPanel) return;
 
-        const isLiquid = doc.fileName.endsWith('.liquid');
-        const isInput = doc.fileName.endsWith('.liquid.json');
-
-        if (isLiquid || isInput) {
+        if (previewPanel.isTrackedFile(doc.fileName)) {
             await previewPanel.run();
         }
     });
 
-    // Auto-refresh on text change (debounced)
+    // Auto-refresh on text change (debounced) — only for the panel's tracked template/input pair
     let debounceTimer: NodeJS.Timeout | undefined;
     const onTextChange = vscode.workspace.onDidChangeTextDocument((event) => {
         const cfg = vscode.workspace.getConfiguration('dotliquid');
         if (!cfg.get<boolean>('autoRefresh', true)) return;
         if (!previewPanel) return;
 
-        const doc = event.document;
-        const isLiquid = doc.fileName.endsWith('.liquid');
-        const isInput = doc.fileName.endsWith('.liquid.json');
-
-        if (isLiquid || isInput) {
+        if (previewPanel.isTrackedFile(event.document.fileName)) {
             const delay = cfg.get<number>('refreshDebounceMs', 500);
             if (debounceTimer) clearTimeout(debounceTimer);
             debounceTimer = setTimeout(async () => {

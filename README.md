@@ -30,7 +30,7 @@ dotnet --version   # must be 8.x or later
 ```
 
 > On first use the extension builds the renderer automatically (`~10s`).
-> The compiled output is cached at `backend/renderer/` and reused for all subsequent renders.
+> The compiled output is cached inside the extension install directory and reused for all subsequent renders.
 
 ---
 

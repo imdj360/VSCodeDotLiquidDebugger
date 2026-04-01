@@ -5,3 +5,6 @@ tsconfig.json
 .vscodeignore
 icon.svg
 *.vsix
+backend/renderer/**
+backend/DotLiquidRenderer/bin/**
+backend/DotLiquidRenderer/obj/**

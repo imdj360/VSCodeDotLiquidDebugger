@@ -3,4 +3,6 @@ out/
 dist/
 *.vsix
 .claude/
-backend/renderer/
+extension/backend/renderer/
+extension/backend/DotLiquidRenderer/bin/
+extension/backend/DotLiquidRenderer/obj/

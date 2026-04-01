@@ -47,18 +47,28 @@ while ((line = Console.ReadLine()) != null) {
 
 // ── Render ────────────────────────────────────────────────────────────────────
 static void Render(RenderRequest req, RenderResult res) {
-    JObject inputObj;
+    JToken inputToken;
     try {
-        inputObj = JObject.Parse(req.InputJson);
+        inputToken = JToken.Parse(req.InputJson);
+        if (inputToken.Type != JTokenType.Object && inputToken.Type != JTokenType.Array) {
+            res.Errors.Add(new RenderError { Message = "Input JSON must be an object or array at the root." });
+            return;
+        }
     } catch (Exception ex) {
         var (el, ec) = ParsePosition(ex.Message);
         res.Errors.Add(new RenderError { Message = $"Input JSON is invalid: {ex.Message}", Line = el, Column = ec });
         return;
     }
 
-    var dataDict = req.WrapContent
-        ? new Dictionary<string, object> { ["content"] = JTokenToObject(inputObj) }
-        : (Dictionary<string, object>)JTokenToObject(inputObj);
+    Dictionary<string, object> dataDict;
+    if (req.WrapContent) {
+        dataDict = new Dictionary<string, object> { ["content"] = JTokenToObject(inputToken) };
+    } else if (inputToken.Type == JTokenType.Object) {
+        dataDict = (Dictionary<string, object>)JTokenToObject(inputToken);
+    } else {
+        // Root array without wrapContent — expose as "items"
+        dataDict = new Dictionary<string, object> { ["items"] = JTokenToObject(inputToken) };
+    }
     var dataHash = Hash.FromDictionary(dataDict);
 
     var (assignLines, instrumented) = InstrumentTemplate(req.Template);

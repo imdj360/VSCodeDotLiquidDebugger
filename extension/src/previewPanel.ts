@@ -84,6 +84,13 @@ export class PreviewPanel {
         return PreviewPanel.currentPanel;
     }
 
+    /** Returns true if fileName is either the tracked .liquid template or its paired .liquid.json input. */
+    public isTrackedFile(fileName: string): boolean {
+        const liquidPath = this.liquidUri.fsPath;
+        const inputPath  = liquidPath.replace(/\.liquid$/, '.liquid.json');
+        return fileName === liquidPath || fileName === inputPath;
+    }
+
     public async run(): Promise<void> {
         const liquidPath = this.liquidUri.fsPath;
 
