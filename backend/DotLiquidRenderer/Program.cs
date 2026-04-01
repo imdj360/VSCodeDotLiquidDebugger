@@ -12,6 +12,7 @@ using DotLiquid;
 using DotLiquid.NamingConventions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 
 // ── One-time DotLiquid setup ──────────────────────────────────────────────────
 Template.NamingConvention = new CSharpNamingConvention();
@@ -24,7 +25,9 @@ while ((line = Console.ReadLine()) != null) {
     var res = new RenderResult();
     var sw  = System.Diagnostics.Stopwatch.StartNew();
     try {
-        var req = JsonConvert.DeserializeObject<RenderRequest>(line)
+        var req = JsonConvert.DeserializeObject<RenderRequest>(line, new JsonSerializerSettings {
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        })
             ?? throw new Exception("Invalid request JSON");
         res.Id = req.Id;
         Render(req, res);
@@ -33,7 +36,9 @@ while ((line = Console.ReadLine()) != null) {
     }
     sw.Stop();
     res.RenderTimeMs = (int)sw.ElapsedMilliseconds;
-    Console.WriteLine(JsonConvert.SerializeObject(res));
+    Console.WriteLine(JsonConvert.SerializeObject(res, new JsonSerializerSettings {
+        ContractResolver = new CamelCasePropertyNamesContractResolver()
+    }));
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
