@@ -132,7 +132,9 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package"
+    "package": "vsce package",
+    "build-renderer": "dotnet build backend/DotLiquidRenderer/DotLiquidRenderer.csproj -c Release -o backend/renderer",
+    "test": "node --test test/renderer.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
