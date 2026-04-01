@@ -36,9 +36,13 @@ while ((line = Console.ReadLine()) != null) {
     }
     sw.Stop();
     res.RenderTimeMs = (int)sw.ElapsedMilliseconds;
-    Console.WriteLine(JsonConvert.SerializeObject(res, new JsonSerializerSettings {
-        ContractResolver = new CamelCasePropertyNamesContractResolver()
-    }));
+    try {
+        Console.WriteLine(JsonConvert.SerializeObject(res, new JsonSerializerSettings {
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        }));
+    } catch {
+        Console.WriteLine($"{{\"id\":{res.Id},\"success\":false,\"output\":\"\",\"variables\":[],\"lineMappings\":[],\"errors\":[{{\"message\":\"Failed to serialize response\"}}],\"renderTimeMs\":{res.RenderTimeMs}}}");
+    }
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
