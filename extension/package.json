@@ -93,10 +93,10 @@
     "configuration": {
       "title": "DotLiquid Debugger",
       "properties": {
-        "dotliquid.dotnetScriptPath": {
+        "dotliquid.dotnetPath": {
           "type": "string",
-          "default": "dotnet-script",
-          "description": "Path to dotnet-script executable (install: dotnet tool install -g dotnet-script)"
+          "default": "dotnet",
+          "description": "Path to the .NET executable. Defaults to 'dotnet' (assumes it is on PATH)."
         },
         "dotliquid.autoRefresh": {
           "type": "boolean",
