@@ -234,6 +234,10 @@ class TraceRecord {
 }
 
 class TraceTag : Tag {
+    // INVARIANT: The NDJSON loop is single-threaded (Console.ReadLine blocks).
+    // Records is cleared before each render and read after — this is safe only
+    // because requests are processed sequentially. Do not add async/parallel
+    // request handling without replacing this with instance-scoped state.
     public static List<TraceRecord> Records { get; } = new();
 
     private int _line;

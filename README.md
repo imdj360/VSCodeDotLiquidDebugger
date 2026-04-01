@@ -20,26 +20,17 @@ Live preview, variable inspection, and line mapping for **DotLiquid templates** 
 
 ## Prerequisites
 
-### 1. .NET SDK (6.0+)
+### .NET 8 SDK
 
 ```bash
 # Check if installed
-dotnet --version
+dotnet --version   # must be 8.x or later
 
-# Install from https://dotnet.microsoft.com/download
+# Install from https://dotnet.microsoft.com/download/dotnet/8.0
 ```
 
-### 2. dotnet-script
-
-```bash
-dotnet tool install -g dotnet-script
-
-# Verify
-dotnet-script --version
-```
-
-> On first run, `dotnet-script` downloads the DotLiquid NuGet package automatically.
-> Subsequent renders use the cached package.
+> On first use the extension builds the renderer automatically (`~10s`).
+> The compiled output is cached at `backend/renderer/` and reused for all subsequent renders.
 
 ---
 
@@ -107,7 +98,7 @@ its resolved value. Click a variable row to jump to the line where it was assign
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `dotliquid.dotnetScriptPath` | `dotnet-script` | Path to dotnet-script executable |
+| `dotliquid.dotnetPath` | `dotnet` | Path to the .NET executable (must be 8.x+) |
 | `dotliquid.autoRefresh` | `true` | Re-render on file save |
 | `dotliquid.refreshDebounceMs` | `500` | Debounce delay before auto-refresh (ms) |
 | `dotliquid.wrapContentObject` | `true` | Wrap input in `{ content: ... }` (Logic Apps mode) |
@@ -123,22 +114,20 @@ access variables directly without the `content.` prefix.
 VS Code Extension (TypeScript)
   │
   ├─ PreviewPanel    — Webview with split output/variable/mapping panels
-  ├─ LiquidBackend   — Spawns dotnet-script process per render
+  ├─ LiquidBackend   — Manages one persistent DotLiquidRenderer process per session
+  │                    (NDJSON over stdin/stdout, spawned once, auto-respawns on crash)
   │
-  └─ backend/renderer.csx  (C# script, dotnet-script)
+  └─ backend/DotLiquidRenderer/  (.NET 8 console app, built on first use)
        │
        └─ DotLiquid 2.0.361 NuGet
             ├─ Template.Parse()
             ├─ Template.Render()
-            ├─ Variable extraction (probe renders)
+            ├─ Variable extraction (TraceTag + InstanceAssigns)
             └─ Line mapping (literal content matching)
 ```
 
-### Why dotnet-script instead of a persistent .NET server?
-
-- Zero setup: no separate process to manage, no port conflicts
-- Cold start is ~300ms on first run (NuGet cache warm), ~50ms after
-- Matches Logic Apps exactly: same NuGet package, same C# naming convention
+The renderer is built once to `backend/renderer/` (gitignored) and reused for all subsequent
+renders. Cold-start cost: ~10s on first use. Subsequent renders: ~5ms.
 
 ### Known limitations
 
@@ -146,7 +135,6 @@ VS Code Extension (TypeScript)
   execution hooks. This is a known gap in the DotLiquid ecosystem.
 - **Line mapping accuracy**: based on literal string matching between template and output.
   Dynamic content (loops, conditionals) maps to the loop/block line, not the iteration.
-- **First render latency**: ~300ms on cold start while dotnet-script resolves NuGet cache.
 
 ---
 

@@ -154,7 +154,7 @@ export class LiquidBackend {
 
     private async checkDotnet(executable: string): Promise<boolean> {
         return new Promise((resolve) => {
-            const proc = cp.spawn(executable, ['--version'], { shell: true });
+            const proc = cp.spawn(executable, ['--version']);
             proc.on('close', (code) => resolve(code === 0));
             proc.on('error', ()     => resolve(false));
         });
