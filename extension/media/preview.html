@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<title>DotLiquid Preview</title>
+<style>
+  :root {
+    --border: var(--vscode-panel-border, #444);
+    --bg: var(--vscode-editor-background, #1e1e1e);
+    --bg2: var(--vscode-sideBar-background, #252526);
+    --fg: var(--vscode-editor-foreground, #d4d4d4);
+    --fg-dim: var(--vscode-descriptionForeground, #888);
+    --accent: var(--vscode-focusBorder, #007acc);
+    --error: var(--vscode-errorForeground, #f44747);
+    --ok: var(--vscode-testing-iconPassed, #4ec9b0);
+    --warn: var(--vscode-editorWarning-foreground, #cca700);
+    --highlight: var(--vscode-editor-findMatchHighlightBackground, rgba(255,200,0,0.15));
+    --tag-bg: var(--vscode-badge-background, #4d4d4d);
+    --tag-fg: var(--vscode-badge-foreground, #fff);
+    --font-mono: var(--vscode-editor-font-family, 'Cascadia Code', 'Fira Code', monospace);
+    --font-ui: var(--vscode-font-family, system-ui, sans-serif);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    color: var(--fg);
+    background: var(--bg);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Toolbar */
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #toolbar .title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--fg-dim);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: var(--tag-bg); color: var(--tag-fg); }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--fg-dim);
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .status-dot.ok      { background: var(--ok); }
+  .status-dot.error   { background: var(--error); }
+  .status-dot.loading { background: var(--warn); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  #status-text { font-size: 11px; color: var(--fg-dim); }
+
+  /* Input banner */
+  #input-banner {
+    padding: 6px 10px;
+    background: color-mix(in srgb, var(--warn) 10%, transparent);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--warn);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  #input-banner.hidden { display: none; }
+  #input-banner span.link {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  /* Main layout */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Left: Output */
+  #output-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    min-width: 0;
+  }
+
+  .panel-header {
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-dim);
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  #output-area {
+    flex: 1;
+    overflow: auto;
+    padding: 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #output-area.error-state { color: var(--error); }
+
+  .output-chunk {
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .output-chunk:hover { background: var(--highlight); }
+  .output-chunk.active {
+    background: var(--highlight);
+    outline: 1px solid var(--accent);
+  }
+
+  /* Right: Sidebar */
+  #sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Variables */
+  #vars-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--border);
+    min-height: 80px;
+    overflow: hidden;
+  }
+  #vars-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+
+  .var-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    align-items: start;
+    gap: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+  }
+  .var-row:hover { background: var(--highlight); }
+  .var-name  { font-family: var(--font-mono); font-size: 11px; color: var(--accent); word-break: break-all; }
+  .var-value { font-family: var(--font-mono); font-size: 11px; color: var(--fg); word-break: break-all; }
+  .var-line  { font-size: 10px; color: var(--fg-dim); white-space: nowrap; }
+
+  .empty-state {
+    padding: 12px 10px;
+    color: var(--fg-dim);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  /* Line map */
+  #mappings-section {
+    flex-shrink: 0;
+    max-height: 180px;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--border);
+  }
+  #mappings-list { overflow-y: auto; }
+  .mapping-row {
+    display: flex;
+    gap: 6px;
+    padding: 2px 10px;
+    cursor: pointer;
+    align-items: baseline;
+    font-size: 11px;
+    font-family: var(--font-mono);
+  }
+  .mapping-row:hover { background: var(--highlight); }
+  .mapping-line    { color: var(--accent); min-width: 28px; }
+  .mapping-preview { color: var(--fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+
+  /* Errors */
+  #errors-section { flex-shrink: 0; max-height: 200px; display: flex; flex-direction: column; }
+  #errors-list { overflow-y: auto; padding: 4px; }
+  .error-item {
+    background: color-mix(in srgb, var(--error) 10%, transparent);
+    border-left: 3px solid var(--error);
+    border-radius: 3px;
+    padding: 5px 8px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    line-height: 1.5;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .error-item:hover { opacity: 0.85; }
+  .error-location { font-size: 10px; color: var(--fg-dim); margin-top: 2px; }
+
+  .badge {
+    font-size: 10px;
+    background: var(--tag-bg);
+    color: var(--tag-fg);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span class="title" id="template-name">DotLiquid Preview</span>
+  <div class="status-dot" id="status-dot"></div>
+  <span id="status-text">Ready</span>
+  <button onclick="run()">&#9654; Run</button>
+  <button class="secondary" onclick="copyOutput()">&#10064; Copy</button>
+</div>
+
+<div id="input-banner" class="hidden">
+  &#9888; No input file found.
+  <span class="link" onclick="openInputFile()">Create <span id="input-file-name"></span></span>
+  &mdash; using empty {} as input.
+</div>
+
+<div id="main">
+
+  <div id="output-panel">
+    <div class="panel-header">
+      <span>Output</span>
+      <span class="badge" id="wrap-badge" title="Logic Apps wraps input in { content: ... }">content.*</span>
+    </div>
+    <div id="output-area"><span style="color:var(--fg-dim)">Press Run or save the template to render.</span></div>
+  </div>
+
+  <div id="sidebar">
+
+    <div id="vars-section">
+      <div class="panel-header">
+        <span>Variables</span>
+        <span id="var-count" style="font-size:10px;font-weight:normal;color:var(--fg-dim)"></span>
+      </div>
+      <div id="vars-list">
+        <div class="empty-state">No variables yet.<br>Use <code>&#123;% assign x = ... %&#125;</code></div>
+      </div>
+    </div>
+
+    <div id="mappings-section">
+      <div class="panel-header">
+        <span>Line Map</span>
+        <span style="font-size:10px;font-weight:normal;color:var(--fg-dim)">click to jump</span>
+      </div>
+      <div id="mappings-list">
+        <div class="empty-state">Run template to see line mappings.</div>
+      </div>
+    </div>
+
+    <div id="errors-section">
+      <div class="panel-header" id="errors-header" style="display:none">
+        <span style="color:var(--error)">Errors</span>
+      </div>
+      <div id="errors-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+  const vscode = acquireVsCodeApi();
+  let activeChunk = null;
+
+  window.addEventListener('message', function(event) {
+    var msg = event.data;
+    if (msg.command === 'loading') {
+      setStatus('loading', 'Rendering...');
+      document.getElementById('output-area').innerHTML = '<span style="color:var(--fg-dim)">Rendering...</span>';
+    } else if (msg.command === 'result') {
+      handleResult(msg);
+    }
+  });
+
+  function handleResult(msg) {
+    var result = msg.result;
+    var templateFileName = msg.templateFileName;
+    var inputFileExists  = msg.inputFileExists;
+    var inputFileName    = msg.inputFileName;
+    var wrapContent      = msg.wrapContent;
+
+    if (templateFileName) {
+      document.getElementById('template-name').textContent = templateFileName;
+    }
+
+    document.getElementById('wrap-badge').style.display = wrapContent ? '' : 'none';
+
+    var banner = document.getElementById('input-banner');
+    if (!inputFileExists) {
+      banner.classList.remove('hidden');
+      document.getElementById('input-file-name').textContent = inputFileName || 'input.liquid.json';
+    } else {
+      banner.classList.add('hidden');
+    }
+
+    if (!result.success) {
+      setStatus('error', 'Error');
+      renderErrors(result.errors);
+      document.getElementById('output-area').textContent = '';
+      document.getElementById('output-area').classList.add('error-state');
+      renderVariables([]);
+      renderMappings([]);
+      return;
+    }
+
+    setStatus('ok', result.renderTimeMs + 'ms');
+    document.getElementById('output-area').classList.remove('error-state');
+    renderErrors([]);
+    renderOutput(result.output, result.lineMappings || []);
+    renderVariables(result.variables || []);
+    renderMappings(result.lineMappings || []);
+  }
+
+  function renderOutput(output, mappings) {
+    var area = document.getElementById('output-area');
+
+    if (!mappings || mappings.length === 0) {
+      area.textContent = output;
+      return;
+    }
+
+    var sorted = mappings.slice().sort(function(a, b) { return a.outputStart - b.outputStart; });
+    var html = '';
+    var pos = 0;
+
+    for (var i = 0; i < sorted.length; i++) {
+      var m = sorted[i];
+      if (m.outputStart > pos) {
+        html += escHtml(output.slice(pos, m.outputStart));
+      }
+      var chunk = output.slice(m.outputStart, m.outputEnd);
+      html += '<span class="output-chunk" data-line="' + m.templateLine +
+              '" onclick="window._chunkClick(this,' + m.templateLine + ')"' +
+              ' title="Template line ' + m.templateLine + '">' +
+              escHtml(chunk) + '</span>';
+      pos = m.outputEnd;
+    }
+
+    if (pos < output.length) {
+      html += escHtml(output.slice(pos));
+    }
+
+    area.innerHTML = html;
+  }
+
+  window._chunkClick = function(el, line) {
+    if (activeChunk) activeChunk.classList.remove('active');
+    el.classList.add('active');
+    activeChunk = el;
+    vscode.postMessage({ command: 'highlightLine', line: line });
+  };
+
+  function renderVariables(variables) {
+    var list  = document.getElementById('vars-list');
+    var count = document.getElementById('var-count');
+
+    if (!variables || variables.length === 0) {
+      list.innerHTML = '<div class="empty-state">No variables yet.<br>Use <code>&#123;% assign x = ... %&#125;</code></div>';
+      count.textContent = '';
+      return;
+    }
+
+    count.textContent = variables.length + ' var' + (variables.length !== 1 ? 's' : '');
+    list.innerHTML = variables.map(function(v) {
+      return '<div class="var-row" onclick="window._jumpLine(' + v.line + ')" title="Line ' + v.line + '">' +
+             '<span class="var-name">{{ ' + escHtml(v.name) + ' }}</span>' +
+             '<span class="var-value">' + escHtml(String(v.value)) + '</span>' +
+             '<span class="var-line">L' + v.line + '</span>' +
+             '</div>';
+    }).join('');
+  }
+
+  function renderMappings(mappings) {
+    var list = document.getElementById('mappings-list');
+    if (!mappings || mappings.length === 0) {
+      list.innerHTML = '<div class="empty-state">No line mappings.</div>';
+      return;
+    }
+
+    var unique = [];
+    var seen = {};
+    for (var i = 0; i < mappings.length; i++) {
+      var m = mappings[i];
+      if (!seen[m.templateLine]) {
+        seen[m.templateLine] = true;
+        unique.push(m);
+      }
+    }
+
+    list.innerHTML = unique.slice(0, 60).map(function(m) {
+      var preview = (m.outputText || '').trim().slice(0, 40);
+      return '<div class="mapping-row" onclick="window._jumpLine(' + m.templateLine + ')">' +
+             '<span class="mapping-line">L' + m.templateLine + '</span>' +
+             '<span class="mapping-preview">' + escHtml(preview) + '</span>' +
+             '</div>';
+    }).join('');
+  }
+
+  function renderErrors(errors) {
+    var list   = document.getElementById('errors-list');
+    var header = document.getElementById('errors-header');
+
+    if (!errors || errors.length === 0) {
+      list.innerHTML = '';
+      header.style.display = 'none';
+      return;
+    }
+
+    header.style.display = '';
+    list.innerHTML = errors.map(function(e) {
+      var clickAttr = e.line ? 'onclick="window._jumpLine(' + e.line + ')"' : '';
+      var loc = e.line ? '<div class="error-location">Line ' + e.line + (e.column ? ', col ' + e.column : '') + '</div>' : '';
+      return '<div class="error-item" ' + clickAttr + '>' + escHtml(e.message) + loc + '</div>';
+    }).join('');
+  }
+
+  function setStatus(type, text) {
+    var dot = document.getElementById('status-dot');
+    var st  = document.getElementById('status-text');
+    dot.className = 'status-dot ' + type;
+    st.textContent = text;
+  }
+
+  window._jumpLine = function(line) {
+    vscode.postMessage({ command: 'highlightLine', line: line });
+  };
+
+  window.run = function() {
+    vscode.postMessage({ command: 'run' });
+  };
+
+  window.copyOutput = function() {
+    var text = document.getElementById('output-area').textContent;
+    vscode.postMessage({ command: 'copyOutput', text: text });
+  };
+
+  window.openInputFile = function() {
+    vscode.postMessage({ command: 'openInputFile' });
+  };
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+})();
+</script>
+</body>
+</html>

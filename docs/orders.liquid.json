@@ -1,0 +1,26 @@
+{
+  "customer": {
+    "name": "Alice Dupont",
+    "email": "ALICE@EXAMPLE.COM"
+  },
+  "orders": [
+    {
+      "id": "ORD-001",
+      "product": "logic apps standard plan",
+      "quantity": 2,
+      "unitPrice": 49.99
+    },
+    {
+      "id": "ORD-002",
+      "product": "integration account",
+      "quantity": 1,
+      "unitPrice": 299.00
+    },
+    {
+      "id": "ORD-003",
+      "product": "api management",
+      "quantity": 3,
+      "unitPrice": 15.50
+    }
+  ]
+}

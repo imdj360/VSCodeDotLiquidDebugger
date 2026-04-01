@@ -1,0 +1,143 @@
+{
+  "name": "dotliquid-debugger",
+  "displayName": "DotLiquid Debugger for Logic Apps",
+  "description": "Live preview, variable inspection and line mapping for DotLiquid Liquid templates — Azure Logic Apps Standard (Transform JSON to JSON). The only DotLiquid-native Liquid extension on the marketplace.",
+  "version": "0.1.0",
+  "publisher": "danieljonathan",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Debuggers", "Other"],
+  "keywords": ["liquid", "dotliquid", "logic apps", "logic apps standard", "azure", "integration", "transform json", "ipaas", "template", "debugger"],
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#007acc",
+    "theme": "dark"
+  },
+  "badges": [
+    {
+      "url": "https://img.shields.io/badge/engine-DotLiquid%202.0.361-blue",
+      "href": "https://github.com/dotliquid/dotliquid",
+      "description": "DotLiquid 2.0.361"
+    },
+    {
+      "url": "https://img.shields.io/badge/target-Logic%20Apps%20Standard-0078d4?logo=microsoftazure",
+      "href": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-enterprise-integration-liquid-transform",
+      "description": "Azure Logic Apps Standard"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imdj360/dotliquid-debugger"
+  },
+  "activationEvents": [
+    "onLanguage:liquid",
+    "onCommand:dotliquid.openPreview",
+    "onCommand:dotliquid.runTemplate"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "dotliquid.openPreview",
+        "title": "DotLiquid: Open Preview Panel",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "dotliquid.runTemplate",
+        "title": "DotLiquid: Run Template",
+        "icon": "$(play)"
+      },
+      {
+        "command": "dotliquid.createInputFile",
+        "title": "DotLiquid: Create Input JSON File"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "dotliquid.openPreview",
+          "when": "resourceExtname == .liquid",
+          "group": "navigation"
+        },
+        {
+          "command": "dotliquid.runTemplate",
+          "when": "resourceExtname == .liquid",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "dotliquid.openPreview",
+          "when": "resourceExtname == .liquid"
+        },
+        {
+          "command": "dotliquid.createInputFile",
+          "when": "resourceExtname == .liquid"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "liquid",
+        "aliases": ["Liquid", "liquid"],
+        "extensions": [".liquid"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "liquid",
+        "scopeName": "text.html.liquid",
+        "path": "./syntaxes/liquid.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "DotLiquid Debugger",
+      "properties": {
+        "dotliquid.dotnetScriptPath": {
+          "type": "string",
+          "default": "dotnet-script",
+          "description": "Path to dotnet-script executable (install: dotnet tool install -g dotnet-script)"
+        },
+        "dotliquid.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically re-render when template or input JSON changes"
+        },
+        "dotliquid.refreshDebounceMs": {
+          "type": "number",
+          "default": 500,
+          "description": "Debounce delay in ms before auto-refresh triggers"
+        },
+        "dotliquid.wrapContentObject": {
+          "type": "boolean",
+          "default": true,
+          "description": "Wrap input JSON in { content: ... } to match Logic Apps Standard behaviour"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "dotliquid.openPreview",
+        "key": "ctrl+shift+l",
+        "when": "resourceExtname == .liquid"
+      },
+      {
+        "command": "dotliquid.runTemplate",
+        "key": "f5",
+        "when": "resourceExtname == .liquid"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}

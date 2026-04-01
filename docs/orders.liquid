@@ -1,0 +1,31 @@
+{%- comment -%}
+  Template: orders.liquid
+  Target: DotLiquid 2.0.361 (Azure Logic Apps Standard)
+  Input: content.* (Logic Apps JSON wrapper applied automatically)
+  Output: JSON
+{%- endcomment -%}
+{%- assign customerName = content.customer.name -%}
+{%- assign orderCount = content.orders | Size -%}
+{%- assign totalItems = 0 -%}
+{%- for order in content.orders -%}
+  {%- assign totalItems = totalItems | Plus: order.quantity -%}
+{%- endfor -%}
+{
+  "customer": "{{ customerName | Upcase }}",
+  "email": "{{ content.customer.email | Downcase }}",
+  "orderCount": {{ orderCount }},
+  "totalItems": {{ totalItems }},
+  "processedDate": "{{ "now" | Date: "yyyy-MM-dd" }}",
+  "status": "{% if orderCount == 0 %}no-orders{% elsif orderCount == 1 %}single{% else %}multiple{% endif %}",
+  "orders": [
+    {%- for order in content.orders -%}
+    {
+      "id": "{{ order.id }}",
+      "product": "{{ order.product | Capitalize }}",
+      "quantity": {{ order.quantity }},
+      "unitPrice": {{ order.unitPrice }},
+      "lineTotal": {{ order.quantity | Times: order.unitPrice }}
+    }{%- if forloop.last == false -%},{%- endif -%}
+    {%- endfor -%}
+  ]
+}
