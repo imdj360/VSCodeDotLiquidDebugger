@@ -271,7 +271,12 @@
   <div id="output-panel">
     <div class="panel-header">
       <span>Output</span>
-      <span class="badge" id="wrap-badge" title="Logic Apps wraps input in { content: ... }">content.*</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="badge" id="wrap-badge" title="Logic Apps wraps input in { content: ... }">content.*</span>
+        <button class="secondary" id="prettify-btn" onclick="togglePretty()"
+                style="display:none;padding:2px 7px;font-size:11px"
+                title="Toggle JSON pretty-print">&#8644; Pretty</button>
+      </div>
     </div>
     <div id="output-area"><span style="color:var(--fg-dim)">Press Run or save the template to render.</span></div>
   </div>
@@ -313,10 +318,17 @@
   'use strict';
   const vscode = acquireVsCodeApi();
   let activeChunk = null;
+  var _rawOutput   = '';
+  var _lastMappings = [];
+  var _parsedJson  = null;
+  var _isPretty    = false;
 
   window.addEventListener('message', function(event) {
     var msg = event.data;
     if (msg.command === 'loading') {
+      _isPretty = false;
+      _parsedJson = null;
+      document.getElementById('prettify-btn').style.display = 'none';
       setStatus('loading', 'Rendering...');
       document.getElementById('output-area').innerHTML = '<span style="color:var(--fg-dim)">Rendering...</span>';
     } else if (msg.command === 'result') {
@@ -350,6 +362,9 @@
       renderErrors(result.errors);
       document.getElementById('output-area').textContent = '';
       document.getElementById('output-area').classList.add('error-state');
+      document.getElementById('prettify-btn').style.display = 'none';
+      _parsedJson = null;
+      _isPretty   = false;
       renderVariables([]);
       renderMappings([]);
       return;
@@ -358,6 +373,21 @@
     setStatus('ok', result.renderTimeMs + 'ms');
     document.getElementById('output-area').classList.remove('error-state');
     renderErrors([]);
+
+    _rawOutput    = result.output;
+    _lastMappings = result.lineMappings || [];
+    _isPretty     = false;
+
+    var btn = document.getElementById('prettify-btn');
+    try {
+      _parsedJson = JSON.parse(result.output);
+      btn.style.display  = '';
+      btn.textContent    = '\u21C4 Pretty';
+    } catch (_) {
+      _parsedJson        = null;
+      btn.style.display  = 'none';
+    }
+
     renderOutput(result.output, result.lineMappings || []);
     renderVariables(result.variables || []);
     renderMappings(result.lineMappings || []);
@@ -488,6 +518,19 @@
 
   window.openInputFile = function() {
     vscode.postMessage({ command: 'openInputFile' });
+  };
+
+  window.togglePretty = function() {
+    if (!_parsedJson) { return; }
+    _isPretty = !_isPretty;
+    var btn  = document.getElementById('prettify-btn');
+    btn.textContent = _isPretty ? '\u21C4 Raw' : '\u21C4 Pretty';
+    var area = document.getElementById('output-area');
+    if (_isPretty) {
+      area.textContent = JSON.stringify(_parsedJson, null, 2);
+    } else {
+      renderOutput(_rawOutput, _lastMappings);
+    }
   };
 
   function escHtml(s) {
