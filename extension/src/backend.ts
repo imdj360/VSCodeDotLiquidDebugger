@@ -46,6 +46,7 @@ export class LiquidBackend {
     private _lineBuffer = '';
     private _pending    = new Map<number, (result: RenderResult) => void>();
     private _nextId     = 1;
+    private readonly _output: vscode.OutputChannel;
 
     private readonly backendDir:  string;
     private readonly rendererDll: string;
@@ -55,6 +56,7 @@ export class LiquidBackend {
         this.backendDir  = path.join(context.extensionPath, 'backend');
         this.rendererDll = path.join(this.backendDir, 'renderer', 'DotLiquidRenderer.dll');
         this.projectDir  = path.join(this.backendDir, 'DotLiquidRenderer');
+        this._output     = vscode.window.createOutputChannel('DotLiquid Debugger');
     }
 
     async render(request: RenderRequest): Promise<RenderResult> {
@@ -102,8 +104,10 @@ export class LiquidBackend {
             }
         });
 
-        // Drain stderr so the pipe buffer never fills and blocks the process
-        proc.stderr!.on('data', () => { /* intentionally empty */ });
+        // Drain stderr into the output channel so pipe buffer never fills
+        proc.stderr!.on('data', (data: Buffer) => {
+            this._output.append(data.toString());
+        });
 
         proc.on('exit', () => {
             this._rejectAll('Renderer process exited unexpectedly. It will respawn on next render.');
@@ -133,6 +137,7 @@ export class LiquidBackend {
         }
 
         const outDir = path.join(this.backendDir, 'renderer');
+        this._output.appendLine('[DotLiquid] Building renderer…');
 
         return vscode.window.withProgress(
             {
@@ -141,13 +146,32 @@ export class LiquidBackend {
                 cancellable: false
             },
             () => new Promise<boolean>((resolve) => {
+                let buildStderr = '';
                 const proc = cp.spawn(
                     dotnet,
                     ['build', '-c', 'Release', '-o', outDir],
                     { cwd: this.projectDir, env: process.env }
                 );
-                proc.on('close', (code) => resolve(code === 0));
-                proc.on('error', ()     => resolve(false));
+                proc.stdout!.on('data', (d: Buffer) => this._output.append(d.toString()));
+                proc.stderr!.on('data', (d: Buffer) => {
+                    const text = d.toString();
+                    this._output.append(text);
+                    buildStderr += text;
+                });
+                proc.on('close', (code) => {
+                    if (code !== 0) {
+                        const tail = buildStderr.trim().split('\n').slice(-5).join('\n');
+                        void vscode.window.showErrorMessage(
+                            `DotLiquid Debugger: renderer build failed.\n${tail}\n\nFull output: DotLiquid Debugger output channel.`,
+                            'Show Output'
+                        ).then(action => { if (action === 'Show Output') { this._output.show(); } });
+                    }
+                    resolve(code === 0);
+                });
+                proc.on('error', (err) => {
+                    this._output.appendLine(`[DotLiquid] Build process error: ${err.message}`);
+                    resolve(false);
+                });
             })
         );
     }
@@ -181,5 +205,6 @@ export class LiquidBackend {
     dispose(): void {
         this._proc?.kill();
         this._proc = null;
+        this._output.dispose();
     }
 }
