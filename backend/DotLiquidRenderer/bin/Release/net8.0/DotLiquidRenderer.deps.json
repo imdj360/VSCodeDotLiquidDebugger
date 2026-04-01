@@ -1,0 +1,62 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "DotLiquidRenderer/1.0.0": {
+        "dependencies": {
+          "DotLiquid": "2.0.361",
+          "Newtonsoft.Json": "13.0.3"
+        },
+        "runtime": {
+          "DotLiquidRenderer.dll": {}
+        }
+      },
+      "DotLiquid/2.0.361": {
+        "runtime": {
+          "lib/netstandard1.3/DotLiquid.dll": {
+            "assemblyVersion": "2.0.361.0",
+            "fileVersion": "2.0.361.0"
+          }
+        },
+        "resources": {
+          "lib/netstandard1.3/it/DotLiquid.resources.dll": {
+            "locale": "it"
+          }
+        }
+      },
+      "Newtonsoft.Json/13.0.3": {
+        "runtime": {
+          "lib/net6.0/Newtonsoft.Json.dll": {
+            "assemblyVersion": "13.0.0.0",
+            "fileVersion": "13.0.3.27908"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "DotLiquidRenderer/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "DotLiquid/2.0.361": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-gqsM9DvtiznbajOIpWj+xut8y45M7Fja2rKM1WVjhveYn3gFiDFjIPHVmcJIoVB4dWUd/dVzTHFv+C13XL5JIg==",
+      "path": "dotliquid/2.0.361",
+      "hashPath": "dotliquid.2.0.361.nupkg.sha512"
+    },
+    "Newtonsoft.Json/13.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==",
+      "path": "newtonsoft.json/13.0.3",
+      "hashPath": "newtonsoft.json.13.0.3.nupkg.sha512"
+    }
+  }
+}

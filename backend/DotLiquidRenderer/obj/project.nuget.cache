@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "7e/CZP7errI=",
+  "success": true,
+  "projectFilePath": "/Users/danieljonathan/Workspace/LearnDJ/DotLiquidDebugger/backend/DotLiquidRenderer/DotLiquidRenderer.csproj",
+  "expectedPackageFiles": [
+    "/Users/danieljonathan/.nuget/packages/dotliquid/2.0.361/dotliquid.2.0.361.nupkg.sha512",
+    "/Users/danieljonathan/.nuget/packages/newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg.sha512",
+    "/Users/danieljonathan/.nuget/packages/microsoft.netcore.app.ref/8.0.22/microsoft.netcore.app.ref.8.0.22.nupkg.sha512",
+    "/Users/danieljonathan/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.22/microsoft.aspnetcore.app.ref.8.0.22.nupkg.sha512",
+    "/Users/danieljonathan/.nuget/packages/microsoft.netcore.app.host.osx-arm64/8.0.22/microsoft.netcore.app.host.osx-arm64.8.0.22.nupkg.sha512"
+  ],
+  "logs": []
+}
