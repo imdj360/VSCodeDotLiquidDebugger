@@ -25,88 +25,46 @@
     },
 
     {
+      "type": "dotliquid",
+      "request": "launch",
       "name": "Sample: invoice-flat (JSON → JSON)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/extension",
-        "${workspaceFolder}/docs/invoice-flat.liquid",
-        "--command", "dotliquid.openPreview"
-      ],
-      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
-      "preLaunchTask": "npm: compile - extension"
+      "template": "${workspaceFolder}/docs/invoice-flat.liquid"
     },
     {
+      "type": "dotliquid",
+      "request": "launch",
       "name": "Sample: sales-order-transform (JSON → JSON)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/extension",
-        "${workspaceFolder}/docs/sales-order-transform.liquid",
-        "--command", "dotliquid.openPreview"
-      ],
-      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
-      "preLaunchTask": "npm: compile - extension"
+      "template": "${workspaceFolder}/docs/sales-order-transform.liquid"
     },
     {
+      "type": "dotliquid",
+      "request": "launch",
       "name": "Sample: person-transform (JSON → JSON)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/extension",
-        "${workspaceFolder}/docs/person-transform.liquid",
-        "--command", "dotliquid.openPreview"
-      ],
-      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
-      "preLaunchTask": "npm: compile - extension"
+      "template": "${workspaceFolder}/docs/person-transform.liquid"
     },
     {
+      "type": "dotliquid",
+      "request": "launch",
       "name": "Sample: order-to-xml (JSON → JSON)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/extension",
-        "${workspaceFolder}/docs/order-to-xml.liquid",
-        "--command", "dotliquid.openPreview"
-      ],
-      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
-      "preLaunchTask": "npm: compile - extension"
+      "template": "${workspaceFolder}/docs/order-to-xml.liquid"
     },
     {
+      "type": "dotliquid",
+      "request": "launch",
       "name": "Sample: email-notification (JSON → HTML)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/extension",
-        "${workspaceFolder}/docs/email-notification.liquid",
-        "--command", "dotliquid.openPreview"
-      ],
-      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
-      "preLaunchTask": "npm: compile - extension"
+      "template": "${workspaceFolder}/docs/email-notification.liquid"
     },
     {
+      "type": "dotliquid",
+      "request": "launch",
       "name": "Sample: customer-to-xml (JSON → XML)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/extension",
-        "${workspaceFolder}/docs/customer-to-xml.liquid",
-        "--command", "dotliquid.openPreview"
-      ],
-      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
-      "preLaunchTask": "npm: compile - extension"
+      "template": "${workspaceFolder}/docs/customer-to-xml.liquid"
     },
     {
-      "name": "Sample: shipping-label (JSON → plain text)",
-      "type": "extensionHost",
+      "type": "dotliquid",
       "request": "launch",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/extension",
-        "${workspaceFolder}/docs/shipping-label.liquid",
-        "--command", "dotliquid.openPreview"
-      ],
-      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
-      "preLaunchTask": "npm: compile - extension"
+      "name": "Sample: shipping-label (JSON → plain text)",
+      "template": "${workspaceFolder}/docs/shipping-label.liquid"
     }
   ]
 }

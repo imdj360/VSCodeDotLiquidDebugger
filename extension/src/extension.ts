@@ -7,6 +7,63 @@ import { PreviewPanel } from './previewPanel';
 let backend: LiquidBackend | undefined;
 let previewPanel: PreviewPanel | undefined;
 
+class DotLiquidDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
+    constructor(private readonly context: vscode.ExtensionContext) {}
+
+    provideDebugConfigurations(): vscode.DebugConfiguration[] {
+        return [{
+            type: 'dotliquid',
+            request: 'launch',
+            name: 'DotLiquid: ${fileBasenameNoExtension}',
+            template: '${file}'
+        }];
+    }
+
+    async resolveDebugConfiguration(
+        folder: vscode.WorkspaceFolder | undefined,
+        config: vscode.DebugConfiguration
+    ): Promise<vscode.DebugConfiguration | undefined> {
+        const wsFolder = folder?.uri.fsPath
+            ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+            ?? '';
+
+        // Resolve template path
+        let templatePath = (config.template as string | undefined) ?? '${file}';
+        templatePath = templatePath
+            .replace('${file}', vscode.window.activeTextEditor?.document.fileName ?? '')
+            .replace('${workspaceFolder}', wsFolder);
+
+        if (!templatePath || !templatePath.endsWith('.liquid') || !fs.existsSync(templatePath)) {
+            vscode.window.showErrorMessage('DotLiquid: "template" must point to an existing .liquid file.');
+            return undefined;
+        }
+
+        // Resolve input path — auto-detect, then file picker
+        let inputPath = (config.input as string | undefined)?.replace('${workspaceFolder}', wsFolder);
+        if (!inputPath) {
+            const autoInput = templatePath.replace(/\.liquid$/, '.liquid.json');
+            if (fs.existsSync(autoInput)) {
+                inputPath = autoInput;
+            } else {
+                const picked = await vscode.window.showOpenDialog({
+                    canSelectMany: false,
+                    filters: { 'JSON Files': ['json'] },
+                    title: `Select input JSON for ${path.basename(templatePath)}`
+                });
+                inputPath = picked?.[0]?.fsPath;
+            }
+        }
+
+        // Open template in editor then open/reuse preview panel
+        const doc = await vscode.workspace.openTextDocument(templatePath);
+        await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
+        previewPanel = PreviewPanel.createOrShow(this.context, backend!, vscode.Uri.file(templatePath));
+
+        // Return undefined — cancels the debug session (no real adapter needed)
+        return undefined;
+    }
+}
+
 export function activate(context: vscode.ExtensionContext) {
     console.log('DotLiquid Debugger activating...');
 
@@ -99,8 +156,13 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    const debugProvider = vscode.debug.registerDebugConfigurationProvider(
+        'dotliquid',
+        new DotLiquidDebugConfigurationProvider(context)
+    );
+
     context.subscriptions.push(
-        openPreview, runTemplate, createInput, onSave, onTextChange,
+        openPreview, runTemplate, createInput, onSave, onTextChange, debugProvider,
         { dispose: () => { if (debounceTimer) { clearTimeout(debounceTimer); } } }
     );
 }

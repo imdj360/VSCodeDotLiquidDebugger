@@ -26,6 +26,40 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "debuggers": [
+      {
+        "type": "dotliquid",
+        "label": "DotLiquid Template",
+        "languages": ["liquid"],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "template": {
+                "type": "string",
+                "description": "Path to the .liquid template file.",
+                "default": "${file}"
+              },
+              "input": {
+                "type": "string",
+                "description": "Path to the JSON input file. Auto-detected as <template>.liquid.json if omitted."
+              }
+            }
+          }
+        },
+        "configurationSnippets": [
+          {
+            "label": "DotLiquid: Preview Template",
+            "description": "Open live preview for a .liquid template",
+            "body": {
+              "type": "dotliquid",
+              "request": "launch",
+              "name": "${2:Preview: ${1:template}}",
+              "template": "^\"\\${workspaceFolder}/${1:path/to/template.liquid}\""
+            }
+          }
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "dotliquid.openPreview",
