@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-NONCE_PLACEHOLDER';">
 <title>DotLiquid Preview</title>
 <style>
   :root {
@@ -159,25 +159,140 @@
     outline: 1px solid var(--accent);
   }
 
+  /* Debug bar */
+  #debug-bar {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 10px;
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg2));
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 2px;
+  }
+  #debug-bar.hidden { display: none; }
+  #debug-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #debug-counter {
+    font-size: 11px;
+    color: var(--fg-dim);
+    min-width: 76px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  #debug-slider { flex: 1; cursor: pointer; accent-color: var(--accent); }
+  .debug-btn { padding: 2px 7px; font-size: 11px; }
+  #step-info {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--fg-dim);
+    padding-left: 2px;
+    word-break: break-all;
+    min-height: 0;
+  }
+  #step-info:empty { display: none; }
+  #step-info .step-cond { color: var(--accent); }
+  #step-info .step-taken { color: var(--ok); font-size: 10px; margin-left: 3px; }
+
+  /* Filter call chain (shown below debug-bar when step has filter calls) */
+  #filter-detail {
+    padding: 3px 10px 3px 38px;
+    background: color-mix(in srgb, var(--accent) 4%, var(--bg));
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg-dim);
+    flex-shrink: 0;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  #filter-detail.hidden { display: none; }
+  .fc-val  { color: var(--fg); }
+  .fc-name { color: var(--accent); }
+  .fc-arg  { color: var(--warn); }
+  .fc-arr  { color: var(--ok); margin: 0 3px; }
+
+  /* Resize handle */
+  #resize-handle {
+    width: 4px;
+    flex-shrink: 0;
+    background: transparent;
+    cursor: col-resize;
+    transition: background 0.15s;
+    position: relative;
+  }
+  #resize-handle:hover, #resize-handle.dragging { background: var(--accent); }
+
+  /* Sidebar collapse tab — sits centered on the resize handle */
+  #sidebar-collapse-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 32px;
+    padding: 0;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--fg-dim);
+    z-index: 5;
+    line-height: 1;
+  }
+  #sidebar-collapse-btn:hover { background: var(--tag-bg); color: var(--fg); }
+
   /* Right: Sidebar */
   #sidebar {
     width: 280px;
+    min-width: 160px;
+    max-width: 600px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    transition: width 0.15s;
   }
+  #sidebar.collapsed { width: 0 !important; min-width: 0; }
+
+  /* Horizontal resize handle (between Variables and Line Map) */
+  #horiz-resize-handle {
+    height: 4px;
+    flex-shrink: 0;
+    background: transparent;
+    cursor: row-resize;
+    transition: background 0.15s;
+  }
+  #horiz-resize-handle:hover, #horiz-resize-handle.dragging { background: var(--accent); }
+
+  /* Collapsible sections */
+  .panel-header { cursor: default; }
+  .panel-header.collapsible { cursor: pointer; user-select: none; }
+  .panel-header.collapsible:hover { background: color-mix(in srgb, var(--accent) 8%, var(--bg2)); }
+  .collapse-icon { font-style: normal; margin-left: 3px; font-size: 10px; }
 
   /* Variables */
   #vars-section {
-    flex: 1;
+    flex: 2;
     display: flex;
     flex-direction: column;
     border-bottom: 1px solid var(--border);
-    min-height: 80px;
+    min-height: 28px;
     overflow: hidden;
   }
   #vars-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+  #vars-section.collapsed { flex: none !important; min-height: 0; }
+  #vars-section.collapsed #vars-list { display: none; }
+
+  /* Line map collapsed */
+  #mappings-section.collapsed { flex: none !important; min-height: 0; }
+  #mappings-section.collapsed #mappings-list { display: none; }
 
   .var-row {
     display: grid;
@@ -202,13 +317,14 @@
 
   /* Line map */
   #mappings-section {
-    flex-shrink: 0;
-    max-height: 180px;
+    flex: 1;
+    min-height: 60px;
     display: flex;
     flex-direction: column;
     border-bottom: 1px solid var(--border);
+    overflow: hidden;
   }
-  #mappings-list { overflow-y: auto; }
+  #mappings-list { flex: 1; overflow-y: auto; }
   .mapping-row {
     display: flex;
     gap: 6px;
@@ -256,13 +372,28 @@
   <span class="title" id="template-name">DotLiquid Preview</span>
   <div class="status-dot" id="status-dot"></div>
   <span id="status-text">Ready</span>
-  <button onclick="run()">&#9654; Run</button>
-  <button class="secondary" onclick="copyOutput()">&#10064; Copy</button>
+  <button id="run-btn">&#9654; Run</button>
+  <button class="secondary" id="copy-btn">&#10064; Copy</button>
+  <button class="secondary" id="debug-btn" style="display:none">&#128030; Debug</button>
 </div>
+
+<div id="debug-bar" class="hidden">
+  <div id="debug-controls">
+    <button class="secondary debug-btn" id="step-first" title="First step">&#10074;&#9664;</button>
+    <button class="secondary debug-btn" id="step-prev" title="Previous step">&#9664; Prev</button>
+    <span id="debug-counter">Step 0 / 0</span>
+    <button class="secondary debug-btn" id="step-next" title="Next step">Next &#9654;</button>
+    <button class="secondary debug-btn" id="step-last" title="Last step">&#9654;&#10074;</button>
+    <input type="range" id="debug-slider" min="0" value="0">
+  </div>
+  <div id="step-info"></div>
+</div>
+
+<div id="filter-detail" class="hidden"></div>
 
 <div id="input-banner" class="hidden">
   &#9888; No input file found.
-  <span class="link" onclick="openInputFile()">Create <span id="input-file-name"></span></span>
+  <span class="link" id="create-input-link">Create <span id="input-file-name"></span></span>
   &mdash; using empty {} as input.
 </div>
 
@@ -273,7 +404,7 @@
       <span>Output</span>
       <div style="display:flex;align-items:center;gap:6px">
         <span class="badge" id="wrap-badge" title="Logic Apps wraps input in { content: ... }">content.*</span>
-        <button class="secondary" id="prettify-btn" onclick="togglePretty()"
+        <button class="secondary" id="prettify-btn"
                 style="display:none;padding:2px 7px;font-size:11px"
                 title="Toggle JSON pretty-print">&#8644; Pretty</button>
       </div>
@@ -281,11 +412,15 @@
     <div id="output-area"><span style="color:var(--fg-dim)">Press Run or save the template to render.</span></div>
   </div>
 
+  <div id="resize-handle">
+    <button id="sidebar-collapse-btn" title="Toggle sidebar">&#9654;</button>
+  </div>
+
   <div id="sidebar">
 
     <div id="vars-section">
-      <div class="panel-header">
-        <span>Variables</span>
+      <div class="panel-header collapsible" id="vars-header" title="Click to collapse">
+        <span>Variables <span class="collapse-icon" id="vars-icon">&#9660;</span></span>
         <span id="var-count" style="font-size:10px;font-weight:normal;color:var(--fg-dim)"></span>
       </div>
       <div id="vars-list">
@@ -293,9 +428,11 @@
       </div>
     </div>
 
+    <div id="horiz-resize-handle"></div>
+
     <div id="mappings-section">
-      <div class="panel-header">
-        <span>Line Map</span>
+      <div class="panel-header collapsible" id="mappings-header" title="Click to collapse">
+        <span>Line Map <span class="collapse-icon" id="mappings-icon">&#9660;</span></span>
         <span style="font-size:10px;font-weight:normal;color:var(--fg-dim)">click to jump</span>
       </div>
       <div id="mappings-list">
@@ -313,22 +450,34 @@
   </div>
 </div>
 
-<script>
+<script nonce="NONCE_PLACEHOLDER">
 (function() {
   'use strict';
   const vscode = acquireVsCodeApi();
+  // Signal to the extension host that the webview is ready to receive messages.
+  // The extension handles 'ready' by triggering the first render, replacing the
+  // previous hard-coded 200 ms setTimeout.
+  vscode.postMessage({ command: 'ready' });
   let activeChunk = null;
-  var _rawOutput   = '';
+  var _rawOutput    = '';
   var _lastMappings = [];
-  var _parsedJson  = null;
-  var _isPretty    = false;
+  var _parsedJson   = null;
+  var _isPretty     = false;
+  var _steps         = [];
+  var _debugMode     = false;
+  var _stepIndex     = 0;
+  var _lastVariables = [];
 
   window.addEventListener('message', function(event) {
     var msg = event.data;
     if (msg.command === 'loading') {
       _isPretty = false;
       _parsedJson = null;
+      _steps = [];
+      exitDebug();
       document.getElementById('prettify-btn').style.display = 'none';
+      document.getElementById('debug-btn').style.display = 'none';
+      document.getElementById('filter-detail').classList.add('hidden');
       setStatus('loading', 'Rendering...');
       document.getElementById('output-area').innerHTML = '<span style="color:var(--fg-dim)">Rendering...</span>';
     } else if (msg.command === 'result') {
@@ -363,8 +512,11 @@
       document.getElementById('output-area').textContent = '';
       document.getElementById('output-area').classList.add('error-state');
       document.getElementById('prettify-btn').style.display = 'none';
+      document.getElementById('debug-btn').style.display = 'none';
       _parsedJson = null;
       _isPretty   = false;
+      _steps      = [];
+      exitDebug();
       renderVariables([]);
       renderMappings([]);
       return;
@@ -376,7 +528,11 @@
 
     _rawOutput    = result.output;
     _lastMappings = result.lineMappings || [];
+    _steps        = result.steps || [];
     _isPretty     = false;
+    exitDebug();
+
+    document.getElementById('debug-btn').style.display = _steps.length > 0 ? '' : 'none';
 
     var btn = document.getElementById('prettify-btn');
     try {
@@ -388,8 +544,9 @@
       btn.style.display  = 'none';
     }
 
+    _lastVariables = result.variables || [];
     renderOutput(result.output, result.lineMappings || []);
-    renderVariables(result.variables || []);
+    renderVariables(_lastVariables);
     renderMappings(result.lineMappings || []);
   }
 
@@ -412,8 +569,7 @@
       }
       var chunk = output.slice(m.outputStart, m.outputEnd);
       html += '<span class="output-chunk" data-line="' + m.templateLine +
-              '" onclick="window._chunkClick(this,' + m.templateLine + ')"' +
-              ' title="Template line ' + m.templateLine + '">' +
+              '" title="Template line ' + m.templateLine + '">' +
               escHtml(chunk) + '</span>';
       pos = m.outputEnd;
     }
@@ -425,12 +581,15 @@
     area.innerHTML = html;
   }
 
-  window._chunkClick = function(el, line) {
-    if (activeChunk) activeChunk.classList.remove('active');
-    el.classList.add('active');
-    activeChunk = el;
-    vscode.postMessage({ command: 'highlightLine', line: line });
-  };
+  // Event delegation for output chunks (replaces inline onclick on dynamically-built spans)
+  document.getElementById('output-area').addEventListener('click', function(e) {
+    var target = e.target.closest('[data-line]');
+    if (!target) { return; }
+    if (activeChunk) { activeChunk.classList.remove('active'); }
+    target.classList.add('active');
+    activeChunk = target;
+    vscode.postMessage({ command: 'highlightLine', line: +target.getAttribute('data-line') });
+  });
 
   function renderVariables(variables) {
     var list  = document.getElementById('vars-list');
@@ -444,7 +603,8 @@
 
     count.textContent = variables.length + ' var' + (variables.length !== 1 ? 's' : '');
     list.innerHTML = variables.map(function(v) {
-      return '<div class="var-row" onclick="window._jumpLine(' + v.line + ')" title="Line ' + v.line + '">' +
+      var style = v.dim ? ' style="opacity:0.3"' : '';
+      return '<div class="var-row" data-jump="' + v.line + '" title="Line ' + v.line + '"' + style + '>' +
              '<span class="var-name">{{ ' + escHtml(v.name) + ' }}</span>' +
              '<span class="var-value">' + escHtml(String(v.value)) + '</span>' +
              '<span class="var-line">L' + v.line + '</span>' +
@@ -459,23 +619,26 @@
       return;
     }
 
-    var unique = [];
-    var seen = {};
+    // Keep all entries (including loop repeats) but label repeated lines as L14×3
+    var counts = {};
+    var shown  = {};
     for (var i = 0; i < mappings.length; i++) {
-      var m = mappings[i];
-      if (!seen[m.templateLine]) {
-        seen[m.templateLine] = true;
-        unique.push(m);
-      }
+      counts[mappings[i].templateLine] = (counts[mappings[i].templateLine] || 0) + 1;
     }
 
-    list.innerHTML = unique.slice(0, 60).map(function(m) {
-      var preview = (m.outputText || '').trim().slice(0, 40);
-      return '<div class="mapping-row" onclick="window._jumpLine(' + m.templateLine + ')">' +
-             '<span class="mapping-line">L' + m.templateLine + '</span>' +
-             '<span class="mapping-preview">' + escHtml(preview) + '</span>' +
-             '</div>';
-    }).join('');
+    var rows = [];
+    for (var i = 0; i < mappings.length && rows.length < 120; i++) {
+      var m   = mappings[i];
+      var key = m.templateLine + ':' + (shown[m.templateLine] || 0);
+      shown[m.templateLine] = (shown[m.templateLine] || 0) + 1;
+      var label   = 'L' + m.templateLine + (counts[m.templateLine] > 1 ? ' <span style="opacity:0.45;font-size:9px">×' + counts[m.templateLine] + '</span>' : '');
+      var preview = (m.outputText || '').trim().slice(0, 36);
+      rows.push('<div class="mapping-row" data-jump="' + m.templateLine + '">' +
+                '<span class="mapping-line">' + label + '</span>' +
+                '<span class="mapping-preview">' + escHtml(preview) + '</span>' +
+                '</div>');
+    }
+    list.innerHTML = rows.join('');
   }
 
   function renderErrors(errors) {
@@ -490,9 +653,9 @@
 
     header.style.display = '';
     list.innerHTML = errors.map(function(e) {
-      var clickAttr = e.line ? 'onclick="window._jumpLine(' + e.line + ')"' : '';
+      var jumpAttr = e.line ? ' data-jump="' + e.line + '"' : '';
       var loc = e.line ? '<div class="error-location">Line ' + e.line + (e.column ? ', col ' + e.column : '') + '</div>' : '';
-      return '<div class="error-item" ' + clickAttr + '>' + escHtml(e.message) + loc + '</div>';
+      return '<div class="error-item"' + jumpAttr + '>' + escHtml(e.message) + loc + '</div>';
     }).join('');
   }
 
@@ -503,16 +666,27 @@
     st.textContent = text;
   }
 
-  window._jumpLine = function(line) {
-    vscode.postMessage({ command: 'highlightLine', line: line });
-  };
-
-  window.run = function() {
-    vscode.postMessage({ command: 'run' });
-  };
+  // Event delegation for sidebar jump-to-line rows (vars, mappings, errors).
+  // Registered here because it only reads data attributes, not function references.
+  function onJumpClick(e) {
+    var row = e.target.closest('[data-jump]');
+    if (!row) { return; }
+    vscode.postMessage({ command: 'highlightLine', line: +row.getAttribute('data-jump') });
+  }
+  document.getElementById('vars-list').addEventListener('click', onJumpClick);
+  document.getElementById('mappings-list').addEventListener('click', onJumpClick);
+  document.getElementById('errors-list').addEventListener('click', onJumpClick);
 
   window.copyOutput = function() {
-    var text = document.getElementById('output-area').textContent;
+    var text;
+    if (_debugMode && _steps.length > 0) {
+      var step = _steps[_stepIndex];
+      text = _rawOutput.slice(0, step.outputEnd);
+    } else if (_isPretty && _parsedJson) {
+      text = JSON.stringify(_parsedJson, null, 2);
+    } else {
+      text = _rawOutput;
+    }
     vscode.postMessage({ command: 'copyOutput', text: text });
   };
 
@@ -532,6 +706,261 @@
       renderOutput(_rawOutput, _lastMappings);
     }
   };
+
+  // ── Step debugger ─────────────────────────────────────────────────────────
+  window.toggleDebug = function() {
+    _debugMode = !_debugMode;
+    var btn = document.getElementById('debug-btn');
+    if (_debugMode && _steps.length > 0) {
+      btn.style.background = 'var(--accent)';
+      btn.style.color = '#fff';
+      _stepIndex = 0;
+      document.getElementById('debug-slider').max = String(_steps.length - 1);
+      document.getElementById('debug-bar').classList.remove('hidden');
+      applyStep(0);
+    } else {
+      exitDebug();
+    }
+  };
+
+  function exitDebug() {
+    _debugMode = false;
+    var btn = document.getElementById('debug-btn');
+    if (btn) { btn.style.background = ''; btn.style.color = ''; }
+    document.getElementById('debug-bar').classList.add('hidden');
+    document.getElementById('filter-detail').classList.add('hidden');
+    document.getElementById('filter-detail').innerHTML = '';
+    document.getElementById('step-info').innerHTML = '';
+    // Restore full render output and variables (if a result is available)
+    if (_rawOutput !== '') {
+      if (_isPretty && _parsedJson) {
+        document.getElementById('output-area').textContent = JSON.stringify(_parsedJson, null, 2);
+      } else {
+        renderOutput(_rawOutput, _lastMappings);
+      }
+    }
+    if (typeof _lastVariables !== 'undefined') { renderVariables(_lastVariables); }
+  }
+
+  window.debugSeek = function(delta) {
+    if (!_steps.length) { return; }
+    if (delta === -Infinity)      { _stepIndex = 0; }
+    else if (delta === Infinity)  { _stepIndex = _steps.length - 1; }
+    else { _stepIndex = Math.max(0, Math.min(_steps.length - 1, _stepIndex + delta)); }
+    applyStep(_stepIndex);
+  };
+
+  window.debugGoTo = function(index) {
+    _stepIndex = Math.max(0, Math.min(_steps.length - 1, index));
+    applyStep(_stepIndex);
+  };
+
+  function applyStep(index) {
+    var step = _steps[index];
+    if (!step) { return; }
+
+    document.getElementById('debug-counter').textContent =
+      'Step ' + (index + 1) + ' / ' + _steps.length;
+    document.getElementById('debug-slider').value = String(index);
+
+    // Step-info label
+    var typeIcons = { assign:'=', for:'↻', if:'?', elsif:'?', unless:'!', else:'⤷', when:'⤷', output:'▸' };
+    var t    = step.stepType || 'output';
+    var icon = typeIcons[t] || '▸';
+    var infoEl = document.getElementById('step-info');
+    if (t === 'output') {
+      infoEl.innerHTML = '<span>' + icon + ' L' + step.line + '</span>';
+    } else if (t === 'assign' || t === 'for') {
+      infoEl.innerHTML = '<span>' + icon + ' ' + t + (step.condition ? ': <span class="step-cond">' + escHtml(step.condition) + '</span>' : '') + '</span>';
+    } else {
+      // if / elsif / else / unless / when
+      var condHtml = step.condition
+        ? ': <span class="step-cond">' + escHtml(step.condition) + '</span><span class="step-taken">✓ taken</span>'
+        : '<span class="step-taken">✓ taken</span>';
+      infoEl.innerHTML = '<span>' + icon + ' ' + t + condHtml + '</span>';
+    }
+
+    vscode.postMessage({ command: 'highlightLine', line: step.line });
+
+    // Filter call chain
+    var filterDetail = document.getElementById('filter-detail');
+    var filterCalls  = step.filterCalls || [];
+    if (filterCalls.length > 0) {
+      var chainHtml = '';
+      for (var fi = 0; fi < filterCalls.length; fi++) {
+        var fc = filterCalls[fi];
+        if (fi === 0) {
+          chainHtml += '<span class="fc-val">' + escHtml(fc.input) + '</span>';
+        }
+        chainHtml += ' <span style="opacity:0.5">|</span> <span class="fc-name">' + escHtml(fc.name) + '</span>';
+        if (fc.arg !== null && fc.arg !== undefined && fc.arg !== '') {
+          chainHtml += '<span style="opacity:0.5">:</span><span class="fc-arg">' + escHtml(fc.arg) + '</span>';
+        }
+        chainHtml += '<span class="fc-arr">→</span><span class="fc-val">' + escHtml(fc.output) + '</span>';
+      }
+      filterDetail.innerHTML = chainHtml;
+      filterDetail.classList.remove('hidden');
+    } else {
+      filterDetail.innerHTML = '';
+      filterDetail.classList.add('hidden');
+    }
+
+    // Output: produced text normal, future text dimmed
+    var area = document.getElementById('output-area');
+    var produced = _rawOutput.slice(0, step.outputEnd);
+    var future   = _rawOutput.slice(step.outputEnd);
+    var html = escHtml(produced);
+    if (future) {
+      html += '<span style="opacity:0.25;user-select:none">' + escHtml(future) + '</span>';
+    }
+    area.innerHTML = html;
+
+    // Variables: show ALL final vars; dim those not yet assigned at this step
+    var stepVars = step.variables || {};
+    var display = _lastVariables.length > 0
+      ? _lastVariables.map(function(v) {
+          var inScope = Object.prototype.hasOwnProperty.call(stepVars, v.name);
+          return { name: v.name, value: inScope ? stepVars[v.name] : v.value, line: v.line, dim: !inScope };
+        })
+      : Object.keys(stepVars).map(function(n) {
+          return { name: n, value: stepVars[n], line: step.line, dim: false };
+        });
+    renderVariables(display);
+  }
+
+  // ── Sidebar toggle ────────────────────────────────────────────────────────
+  var _sidebarWidth = null;
+  window.toggleSidebar = function() {
+    var sidebar = document.getElementById('sidebar');
+    var btn     = document.getElementById('sidebar-collapse-btn');
+    var handle  = document.getElementById('resize-handle');
+    if (sidebar.classList.contains('collapsed')) {
+      sidebar.classList.remove('collapsed');
+      if (_sidebarWidth) { sidebar.style.width = _sidebarWidth; }
+      btn.innerHTML = '&#9654;';
+      handle.style.cursor = 'col-resize';
+    } else {
+      _sidebarWidth = sidebar.style.width || sidebar.offsetWidth + 'px';
+      sidebar.classList.add('collapsed');
+      btn.innerHTML = '&#9664;';
+      handle.style.cursor = 'pointer';
+    }
+  };
+
+  // ── Section collapse ──────────────────────────────────────────────────────
+  window.toggleSection = function(name) {
+    var section = document.getElementById(name + '-section');
+    var icon    = document.getElementById(name + '-icon');
+    section.classList.toggle('collapsed');
+    icon.innerHTML = section.classList.contains('collapsed') ? '&#9658;' : '&#9660;';
+
+    var varsSection     = document.getElementById('vars-section');
+    var mappingsSection = document.getElementById('mappings-section');
+    var horizHandle     = document.getElementById('horiz-resize-handle');
+    var varsColl     = varsSection.classList.contains('collapsed');
+    var mappingsColl = mappingsSection.classList.contains('collapsed');
+
+    // Reset any manual height set by the drag handle so flex takes over
+    varsSection.style.height = '';
+
+    if (!varsColl && !mappingsColl) {
+      varsSection.style.flex     = '2';
+      mappingsSection.style.flex = '1';
+      horizHandle.style.display  = '';
+    } else if (varsColl && !mappingsColl) {
+      mappingsSection.style.flex = '1';
+      horizHandle.style.display  = 'none';
+    } else if (!varsColl && mappingsColl) {
+      varsSection.style.flex    = '1';
+      horizHandle.style.display = 'none';
+    } else {
+      horizHandle.style.display = 'none';
+    }
+  };
+
+  // ── Horizontal resize (Variables ↕ Line Map) ──────────────────────────────
+  (function() {
+    var handle   = document.getElementById('horiz-resize-handle');
+    var varsSection = document.getElementById('vars-section');
+    var dragging = false;
+    var startY, startH;
+
+    handle.addEventListener('mousedown', function(e) {
+      dragging = true;
+      startY   = e.clientY;
+      startH   = varsSection.offsetHeight;
+      handle.classList.add('dragging');
+      document.body.style.cursor    = 'row-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      var newH = Math.max(60, Math.min(600, startH + (e.clientY - startY)));
+      varsSection.style.flex   = 'none';
+      varsSection.style.height = newH + 'px';
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor    = '';
+      document.body.style.userSelect = '';
+    });
+  })();
+
+  // ── Resize handle ─────────────────────────────────────────────────────────
+  (function() {
+    var handle  = document.getElementById('resize-handle');
+    var sidebar = document.getElementById('sidebar');
+    var main    = document.getElementById('main');
+    var dragging = false;
+    var startX, startW;
+
+    handle.addEventListener('mousedown', function(e) {
+      if (e.target.id === 'sidebar-collapse-btn') { return; }
+      if (sidebar.classList.contains('collapsed'))  { return; }
+      dragging = true;
+      startX   = e.clientX;
+      startW   = sidebar.offsetWidth;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      var delta  = startX - e.clientX;
+      var newW   = Math.min(600, Math.max(160, startW + delta));
+      sidebar.style.width = newW + 'px';
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    });
+  })();
+
+  // Static button bindings — placed after all function definitions so references resolve.
+  document.getElementById('run-btn').addEventListener('click', function() { vscode.postMessage({ command: 'run' }); });
+  document.getElementById('copy-btn').addEventListener('click', window.copyOutput);
+  document.getElementById('debug-btn').addEventListener('click', window.toggleDebug);
+  document.getElementById('step-first').addEventListener('click', function() { window.debugSeek(-Infinity); });
+  document.getElementById('step-prev').addEventListener('click', function() { window.debugSeek(-1); });
+  document.getElementById('step-next').addEventListener('click', function() { window.debugSeek(1); });
+  document.getElementById('step-last').addEventListener('click', function() { window.debugSeek(Infinity); });
+  document.getElementById('debug-slider').addEventListener('input', function() { window.debugGoTo(+this.value); });
+  document.getElementById('create-input-link').addEventListener('click', window.openInputFile);
+  document.getElementById('prettify-btn').addEventListener('click', window.togglePretty);
+  document.getElementById('sidebar-collapse-btn').addEventListener('click', window.toggleSidebar);
+  document.getElementById('vars-header').addEventListener('click', function() { window.toggleSection('vars'); });
+  document.getElementById('mappings-header').addEventListener('click', function() { window.toggleSection('mappings'); });
 
   function escHtml(s) {
     return String(s)

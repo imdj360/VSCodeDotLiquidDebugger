@@ -32,6 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (!previewPanel) {
             previewPanel = PreviewPanel.createOrShow(context, backend!, editor.document.uri);
         }
+        if (!previewPanel) { return; } // panel creation failed (e.g. missing media/preview.html)
         await previewPanel.run();
     });
 
@@ -58,7 +59,14 @@ export function activate(context: vscode.ExtensionContext) {
             ]
         };
 
-        fs.writeFileSync(inputPath, JSON.stringify(sample, null, 2));
+        try {
+            fs.writeFileSync(inputPath, JSON.stringify(sample, null, 2));
+        } catch (err: unknown) {
+            vscode.window.showErrorMessage(
+                `DotLiquid Debugger: could not create input file — ${(err as Error).message}`
+            );
+            return;
+        }
         const doc = await vscode.workspace.openTextDocument(inputPath);
         await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
         vscode.window.showInformationMessage(`Created ${path.basename(inputPath)} — edit this as your template input.`);
@@ -91,7 +99,10 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(openPreview, runTemplate, createInput, onSave, onTextChange);
+    context.subscriptions.push(
+        openPreview, runTemplate, createInput, onSave, onTextChange,
+        { dispose: () => { if (debounceTimer) { clearTimeout(debounceTimer); } } }
+    );
 }
 
 export function deactivate() {

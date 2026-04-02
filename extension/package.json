@@ -2,7 +2,7 @@
   "name": "dotliquid-debugger",
   "displayName": "DotLiquid Debugger for Logic Apps",
   "description": "Live preview, variable inspection and line mapping for DotLiquid Liquid templates — Azure Logic Apps Standard (Transform JSON to JSON). The only DotLiquid-native Liquid extension on the marketplace.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "danieljonathan",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Debuggers", "Other"],
@@ -23,15 +23,6 @@
       "href": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-enterprise-integration-liquid-transform",
       "description": "Azure Logic Apps Standard"
     }
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/imdj360/dotliquid-debugger"
-  },
-  "activationEvents": [
-    "onLanguage:liquid",
-    "onCommand:dotliquid.openPreview",
-    "onCommand:dotliquid.runTemplate"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -134,7 +125,8 @@
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
     "build-renderer": "dotnet build backend/DotLiquidRenderer/DotLiquidRenderer.csproj -c Release -o backend/renderer",
-    "test": "npm run compile && node --test test/*.test.mjs"
+    "test:csharp": "dotnet test backend/DotLiquidRenderer.Tests/DotLiquidRenderer.Tests.csproj -c Release",
+    "test": "npm run compile && npm run test:csharp && npm run build-renderer && node --test test/*.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

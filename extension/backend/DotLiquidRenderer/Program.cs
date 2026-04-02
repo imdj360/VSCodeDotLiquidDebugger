@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using DotLiquid;
 using DotLiquid.NamingConventions;
@@ -22,7 +23,7 @@ Template.RegisterTag<TraceTag>("__trace__");
 string? line;
 while ((line = Console.ReadLine()) != null) {
     if (string.IsNullOrWhiteSpace(line)) continue;
-    var res = new RenderResult();
+    var res = new RenderResult { Id = TryExtractRequestId(line) ?? 0 };
     var sw  = System.Diagnostics.Stopwatch.StartNew();
     try {
         var req = JsonConvert.DeserializeObject<RenderRequest>(line, new JsonSerializerSettings {
@@ -41,7 +42,7 @@ while ((line = Console.ReadLine()) != null) {
             ContractResolver = new CamelCasePropertyNamesContractResolver()
         }));
     } catch {
-        Console.WriteLine($"{{\"id\":{res.Id},\"success\":false,\"output\":\"\",\"variables\":[],\"lineMappings\":[],\"errors\":[{{\"message\":\"Failed to serialize response\"}}],\"renderTimeMs\":{res.RenderTimeMs}}}");
+        Console.WriteLine($"{{\"id\":{res.Id},\"success\":false,\"output\":\"\",\"variables\":[],\"lineMappings\":[],\"steps\":[],\"errors\":[{{\"message\":\"Failed to serialize response\"}}],\"renderTimeMs\":{res.RenderTimeMs}}}");
     }
 }
 
@@ -83,16 +84,21 @@ static void Render(RenderRequest req, RenderResult res) {
     }
 
     TraceTag.Records.Clear();
+    var tracingWriter = new TracingWriter();
+    TraceTag.CurrentWriter = tracingWriter;
     string rawOutput;
     try {
-        rawOutput = template.Render(new RenderParameters(CultureInfo.InvariantCulture) {
+        template.Render(tracingWriter, new RenderParameters(CultureInfo.InvariantCulture) {
             LocalVariables    = dataHash,
             ErrorsOutputMode  = ErrorsOutputMode.Rethrow
         });
+        rawOutput = tracingWriter.ToString();
     } catch (Exception ex) {
         var (el, ec) = ParsePosition(ex.Message);
         res.Errors.Add(new RenderError { Message = $"Render error: {ex.Message}", Line = el, Column = ec });
         return;
+    } finally {
+        TraceTag.CurrentWriter = null;
     }
 
     if (template.Errors?.Count > 0) {
@@ -122,10 +128,56 @@ static void Render(RenderRequest req, RenderResult res) {
     }
     variables.Sort((a, b) => a.Line.CompareTo(b.Line));
 
+    var lineMappings = BuildLineMappings(req.Template, rawOutput);
+
+    // Build trace steps sequentially so each assign step can evaluate its filter
+    // chain using the raw scope from the *previous* checkpoint (before the assign).
+    // Seed with dataDict so that the very first assign can resolve template variables
+    // such as content.n (otherwise prevRawScope would be empty and all variable refs
+    // fall back to blank values, making numeric filters read as 0).
+    var traceSteps = new List<StepRecord>();
+    var templateLines = req.Template.Split('\n');
+    var prevRawScope = dataDict;
+    foreach (var cp in tracingWriter.Checkpoints) {
+        var stepType = string.IsNullOrEmpty(cp.StepType) ? "assign" : cp.StepType;
+        traceSteps.Add(new StepRecord {
+            Line        = cp.Line,
+            StepType    = stepType,
+            Condition   = string.IsNullOrEmpty(cp.Condition) ? null : cp.Condition,
+            OutputEnd   = cp.OutputLength,
+            Variables   = cp.Scope
+                .Where(kv => !kv.Key.StartsWith("__") && kv.Key != "forloop")
+                .ToDictionary(kv => kv.Key, kv => FormatValue(kv.Value)),
+            FilterCalls = stepType == "assign"
+                ? FilterReplay.BuildFilterCalls(templateLines, cp.Line, prevRawScope)
+                : new List<FilterCall>()
+        });
+        prevRawScope = cp.Scope;
+    }
+
+    // Output steps — one per lineMappings entry so loop bodies step per-iteration.
+    // Variables carry forward the final trace snapshot (all assigns resolved).
+    var finalVars = traceSteps.LastOrDefault()?.Variables ?? new Dictionary<string, string>();
+    var outputSteps = lineMappings
+        .OrderBy(m => m.OutputStart)
+        .Select(m => new StepRecord {
+            Line      = m.TemplateLine,
+            OutputEnd = m.OutputEnd,
+            Variables = finalVars
+        });
+
+    var steps = traceSteps.Concat(outputSteps).OrderBy(s => s.OutputEnd).ToList();
+    // Clamp last step to full output so closing tokens (too short to map) are never dimmed
+    if (steps.Count > 0 && steps[^1].OutputEnd < rawOutput.Length) {
+        var last = steps[^1];
+        steps[^1] = new StepRecord { Line = last.Line, OutputEnd = rawOutput.Length, StepType = last.StepType, Condition = last.Condition, Variables = last.Variables, FilterCalls = last.FilterCalls };
+    }
+
     res.Success      = true;
     res.Output       = rawOutput;
     res.Variables    = variables;
-    res.LineMappings = BuildLineMappings(req.Template, rawOutput);
+    res.LineMappings = lineMappings;
+    res.Steps        = steps;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -135,18 +187,48 @@ static (Dictionary<string, int> assignLines, string instrumented) InstrumentTemp
     var lines       = template.Split('\n');
     var assignPat   = new Regex(@"\{%-?\s*assign\s+(\w+)\s*=");
     var capturePat  = new Regex(@"\{%-?\s*capture\s+(\w+)\s*-?%\}");
+    var forPat      = new Regex(@"\{%-?\s*for\s+(\w+\s+in\s+\S+)");
+    var ifPat       = new Regex(@"\{%-?\s*if\s+(.+?)\s*-?%\}");
+    var elsifPat    = new Regex(@"\{%-?\s*elsif\s+(.+?)\s*-?%\}");
+    var elsePat     = new Regex(@"\{%-?\s*else\s*-?%\}");
+    var unlessPat   = new Regex(@"\{%-?\s*unless\s+(.+?)\s*-?%\}");
+    var whenPat     = new Regex(@"\{%-?\s*when\s+(.+?)\s*-?%\}");
 
     for (int i = 0; i < lines.Length; i++) {
-        var ln = lines[i];
+        var ln  = lines[i];
+        var num = i + 1;
         outLines.Add(ln);
+
         var am = assignPat.Match(ln);
         if (am.Success) {
             var name = am.Groups[1].Value;
-            assignLines[name] = i + 1;
-            outLines.Add($"{{%- __trace__ {i + 1} -%}}");
+            assignLines[name] = num;
+            outLines.Add($"{{%- __trace__ {num} assign -%}}");
         }
         var cm = capturePat.Match(ln);
-        if (cm.Success) { assignLines[cm.Groups[1].Value] = i + 1; }
+        if (cm.Success) { assignLines[cm.Groups[1].Value] = num; }
+
+        // for — fires each iteration; includes loop expression for context
+        var fm = forPat.Match(ln);
+        if (fm.Success) {
+            outLines.Add($"{{%- __trace__ {num} for {fm.Groups[1].Value.Trim()} -%}}");
+        }
+
+        // condition branches — trace fires only if that branch executes
+        var ifm = ifPat.Match(ln);
+        if (ifm.Success)     { outLines.Add($"{{%- __trace__ {num} if {ifm.Groups[1].Value.Trim()} -%}}"); }
+
+        var em = elsifPat.Match(ln);
+        if (em.Success)      { outLines.Add($"{{%- __trace__ {num} elsif {em.Groups[1].Value.Trim()} -%}}"); }
+
+        if (elsePat.IsMatch(ln)) {
+                               outLines.Add($"{{%- __trace__ {num} else -%}}"); }
+
+        var um = unlessPat.Match(ln);
+        if (um.Success)      { outLines.Add($"{{%- __trace__ {num} unless {um.Groups[1].Value.Trim()} -%}}"); }
+
+        var wm = whenPat.Match(ln);
+        if (wm.Success)      { outLines.Add($"{{%- __trace__ {num} when {wm.Groups[1].Value.Trim()} -%}}"); }
     }
     return (assignLines, string.Join('\n', outLines));
 }
@@ -173,15 +255,59 @@ static List<LineMapping> BuildLineMappings(string templateText, string output) {
         if (end < 0) end = output.Length;
         mappings.Add(new LineMapping { TemplateLine = i + 1, OutputStart = idx, OutputEnd = end, OutputText = output[idx..end] });
         searchFrom = Math.Min(end, output.Length);
+
+        // Claim additional occurrences (loop iterations) only from the LAST template
+        // line that shares this fragment.  Earlier lines with the same text claim one
+        // occurrence each via the outer forward-scan.  The last line then picks up all
+        // remaining occurrences, which are loop iterations of that line.
+        // Example: "hello / {% for %} / hello / {% endfor %}"
+        //   → line 1 claims first hello, line 3 (last with "hello") claims all remaining.
+        // Example: "alpha / alpha" (two static identical lines, no loop)
+        //   → line 1 claims first alpha, line 2 (last) claims second — inner while finds none.
+        if (IsLastLineWithFragment(lines, i, longest, tagLine, tagSplit)) {
+            var scanFrom = searchFrom;
+            while (scanFrom < output.Length) {
+                var nIdx = output.IndexOf(longest, scanFrom, StringComparison.Ordinal);
+                if (nIdx < 0) break;
+                var nEnd = output.IndexOf('\n', nIdx + longest.Length);
+                if (nEnd < 0) nEnd = output.Length;
+                mappings.Add(new LineMapping { TemplateLine = i + 1, OutputStart = nIdx, OutputEnd = nEnd, OutputText = output[nIdx..nEnd] });
+                scanFrom = Math.Min(nEnd + 1, output.Length);
+            }
+        }
     }
+    mappings.Sort((a, b) => a.OutputStart.CompareTo(b.OutputStart));
     return mappings;
+}
+
+// Returns true when no non-tag template line AFTER thisIndex produces the same fragment.
+// Earlier lines with the same fragment each claim one occurrence and stop; the last line
+// claims all remaining occurrences (loop iterations).
+static bool IsLastLineWithFragment(string[] lines, int thisIndex, string fragment, Regex tagLine, Regex tagSplit) {
+    for (int j = thisIndex + 1; j < lines.Length; j++) {
+        var s = lines[j].Trim();
+        if (string.IsNullOrWhiteSpace(s) || tagLine.IsMatch(s)) continue;
+        var longest = tagSplit.Split(s).Select(p => p.Trim()).OrderByDescending(p => p.Length).FirstOrDefault() ?? "";
+        if (longest == fragment) return false;
+    }
+    return true;
 }
 
 static string FormatValue(object? v) {
     if (v is null)                             return "null";
     if (v is string s)                         return s;
-    if (v is IEnumerable<object> list)         return $"[{string.Join(", ", list.Take(5).Select(FormatValue))}]";
-    if (v is IDictionary<string, object> dict) return $"{{{string.Join(", ", dict.Take(3).Select(kv => $"{kv.Key}: {FormatValue(kv.Value)}"))}}}";
+    if (v is IEnumerable<object> list) {
+        var items = list as IList<object> ?? list.ToList();
+        var preview = items.Take(5).Select(FormatValue).ToList();
+        var more = items.Count > preview.Count ? $", ... (+{items.Count - preview.Count})" : "";
+        return $"[{string.Join(", ", preview)}{more}]";
+    }
+    if (v is IDictionary<string, object> dict) {
+        var entries = dict as ICollection<KeyValuePair<string, object>> ?? dict.ToList();
+        var preview = entries.Take(3).Select(kv => $"{kv.Key}: {FormatValue(kv.Value)}").ToList();
+        var more = entries.Count > preview.Count ? $", ... (+{entries.Count - preview.Count})" : "";
+        return $"{{{string.Join(", ", preview)}{more}}}";
+    }
     return v.ToString() ?? "";
 }
 
@@ -201,6 +327,11 @@ static (int? line, int? col) ParsePosition(string msg) {
     return (int.Parse(m.Groups[1].Value), m.Groups[2].Success ? int.Parse(m.Groups[2].Value) : null);
 }
 
+static int? TryExtractRequestId(string jsonLine) {
+    var m = Regex.Match(jsonLine, "\"id\"\\s*:\\s*(\\d+)");
+    return m.Success ? int.Parse(m.Groups[1].Value) : null;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 class RenderRequest {
     public int    Id          { get; set; }
@@ -215,8 +346,33 @@ class RenderResult {
     public string              Output       { get; set; } = "";
     public List<TraceVariable> Variables    { get; set; } = new();
     public List<LineMapping>   LineMappings { get; set; } = new();
+    public List<StepRecord>    Steps        { get; set; } = new();
     public List<RenderError>   Errors       { get; set; } = new();
     public int                 RenderTimeMs { get; set; }
+}
+
+class StepRecord {
+    public int                        Line        { get; set; }
+    public int                        OutputEnd   { get; set; }
+    public string                     StepType    { get; set; } = "output";
+    public string?                    Condition   { get; set; }
+    public Dictionary<string, string> Variables   { get; set; } = new();
+    public List<FilterCall>           FilterCalls { get; set; } = new();
+}
+
+class FilterCall {
+    public string  Name   { get; set; } = "";
+    public string  Input  { get; set; } = "";
+    public string? Arg    { get; set; }
+    public string  Output { get; set; } = "";
+}
+
+class TracingWriter : StringWriter {
+    public record Checkpoint(int OutputLength, int Line, string StepType, string? Condition, Dictionary<string, object> Scope);
+    public List<Checkpoint> Checkpoints { get; } = new();
+    public TracingWriter() : base(new StringBuilder()) { }
+    public void AddCheckpoint(int line, string stepType, string? condition, Dictionary<string, object> scope) =>
+        Checkpoints.Add(new Checkpoint(GetStringBuilder().Length, line, stepType, condition, scope));
 }
 
 class TraceVariable {
@@ -245,16 +401,22 @@ class TraceRecord {
 
 class TraceTag : Tag {
     // INVARIANT: The NDJSON loop is single-threaded (Console.ReadLine blocks).
-    // Records is cleared before each render and read after — this is safe only
-    // because requests are processed sequentially. Do not add async/parallel
-    // request handling without replacing this with instance-scoped state.
-    public static List<TraceRecord> Records { get; } = new();
+    // Records and CurrentWriter are cleared/set before each render — safe only
+    // because requests are processed sequentially. Do not parallelize.
+    // Records feed the Variables sidebar; Writer checkpoints feed the step timeline.
+    public static List<TraceRecord> Records       { get; } = new();
+    public static TracingWriter?    CurrentWriter { get; set; }
 
-    private int _line;
+    private int     _line;
+    private string  _stepType  = "assign";
+    private string? _condition = null;
 
     public override void Initialize(string tagName, string markup, List<string> tokens) {
         base.Initialize(tagName, markup, tokens);
-        int.TryParse(markup.Trim(), out _line);
+        var parts = markup.Trim().Split(new char[]{' '}, 3);
+        if (parts.Length >= 1) int.TryParse(parts[0], out _line);
+        if (parts.Length >= 2) _stepType  = parts[1];
+        if (parts.Length >= 3) _condition = parts[2];
     }
 
     public override void Render(Context context, TextWriter result) {
@@ -265,5 +427,6 @@ class TraceTag : Tag {
             }
         }
         Records.Add(new TraceRecord { Line = _line, Scope = snap });
+        CurrentWriter?.AddCheckpoint(_line, _stepType, _condition, snap);
     }
 }

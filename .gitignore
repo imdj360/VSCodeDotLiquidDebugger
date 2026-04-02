@@ -4,5 +4,8 @@ dist/
 *.vsix
 .claude/
 extension/backend/renderer/
-extension/backend/DotLiquidRenderer/bin/
-extension/backend/DotLiquidRenderer/obj/
+# .NET build outputs for all backend projects (renderer + test project)
+extension/backend/**/bin/
+extension/backend/**/obj/
+extension/backend/**/TestResults/
+.DS_Store

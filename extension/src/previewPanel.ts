@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { LiquidBackend, RenderResult } from './backend';
 
 export class PreviewPanel {
@@ -36,11 +37,13 @@ export class PreviewPanel {
             isWholeLine: true
         });
 
-        this.panel.webview.html = this.loadWebviewHtml();
-
         this.panel.webview.onDidReceiveMessage(
             async (message) => {
                 switch (message.command) {
+                    case 'ready':
+                        // Webview signals it has finished loading — safer than a fixed setTimeout
+                        await this.run();
+                        break;
                     case 'run':
                         await this.run();
                         break;
@@ -60,27 +63,37 @@ export class PreviewPanel {
             this.disposables
         );
 
-        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+        try {
+            this.panel.webview.html = this.loadWebviewHtml();
+        } catch (err: unknown) {
+            void vscode.window.showErrorMessage((err as Error).message);
+            throw err; // re-throw so createOrShow can bail out
+        }
 
-        // Auto-run after webview has loaded
-        setTimeout(() => this.run(), 200);
+        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     }
 
     public static createOrShow(
         context: vscode.ExtensionContext,
         backend: LiquidBackend,
         liquidUri: vscode.Uri
-    ): PreviewPanel {
+    ): PreviewPanel | undefined {
         if (PreviewPanel.currentPanel) {
             PreviewPanel.currentPanel.panel.reveal(vscode.ViewColumn.Beside);
             PreviewPanel.currentPanel.liquidUri = liquidUri;
             PreviewPanel.currentPanel.panel.title =
                 `DotLiquid: ${path.basename(liquidUri.fsPath)}`;
-            setTimeout(() => PreviewPanel.currentPanel?.run(), 100);
+            // liquidUri is already updated; call run() directly without a timer.
+            void PreviewPanel.currentPanel.run();
             return PreviewPanel.currentPanel;
         }
 
-        PreviewPanel.currentPanel = new PreviewPanel(context, backend, liquidUri);
+        try {
+            PreviewPanel.currentPanel = new PreviewPanel(context, backend, liquidUri);
+        } catch {
+            // Error already shown to user by the constructor
+            return undefined;
+        }
         return PreviewPanel.currentPanel;
     }
 
@@ -209,16 +222,26 @@ export class PreviewPanel {
             output: '',
             variables: [],
             lineMappings: [],
+            steps: [],
             errors: [{ message }],
             renderTimeMs: 0
         };
     }
 
     private loadWebviewHtml(): string {
-        const htmlPath = path.join(
-            this.context.extensionPath, 'media', 'preview.html'
-        );
-        return fs.readFileSync(htmlPath, 'utf8');
+        const htmlPath = path.join(this.context.extensionPath, 'media', 'preview.html');
+        let html: string;
+        try {
+            html = fs.readFileSync(htmlPath, 'utf8');
+        } catch (err: unknown) {
+            throw new Error(
+                `DotLiquid Debugger: failed to load preview UI (${(err as Error).message}). ` +
+                `Try reinstalling the extension.`
+            );
+        }
+        // Per-session nonce for the script-src CSP — replaces the placeholder in preview.html
+        const nonce = crypto.randomBytes(16).toString('hex');
+        return html.replace(/NONCE_PLACEHOLDER/g, nonce);
     }
 
     public dispose(): void {

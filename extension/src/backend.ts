@@ -28,11 +28,28 @@ export interface RenderError {
     column?: number;
 }
 
+export interface FilterCall {
+    name: string;
+    input: string;
+    arg?: string;
+    output: string;
+}
+
+export interface StepRecord {
+    line: number;
+    outputEnd: number;
+    stepType: string;
+    condition?: string;
+    variables: Record<string, string>;
+    filterCalls?: FilterCall[];
+}
+
 export interface RenderResult {
     success: boolean;
     output: string;
     variables: TraceVariable[];
     lineMappings: LineMapping[];
+    steps: StepRecord[];
     errors: RenderError[];
     renderTimeMs: number;
 }
@@ -46,6 +63,8 @@ export class LiquidBackend {
     private _lineBuffer = '';
     private _pending    = new Map<number, (result: RenderResult) => void>();
     private _nextId     = 1;
+    private _disposing  = false;
+    private _disposed   = false;
     private readonly _output: vscode.OutputChannel;
 
     private readonly backendDir:  string;
@@ -60,6 +79,10 @@ export class LiquidBackend {
     }
 
     async render(request: RenderRequest): Promise<RenderResult> {
+        if (this._disposed) {
+            return this.errResult('Renderer backend has been disposed.');
+        }
+
         const proc = await this.ensureProcess();
         if (!proc) {
             return this.errResult(
@@ -72,11 +95,25 @@ export class LiquidBackend {
 
         return new Promise<RenderResult>((resolve) => {
             this._pending.set(id, resolve);
-            proc.stdin!.write(JSON.stringify(wire) + '\n');
+            try {
+                proc.stdin!.write(JSON.stringify(wire) + '\n', (err) => {
+                    if (err) {
+                        const r = this._pending.get(id);
+                        if (r) {
+                            this._pending.delete(id);
+                            r(this.errResult(`Write to renderer failed: ${err.message}`));
+                        }
+                    }
+                });
+            } catch (err: unknown) {
+                this._pending.delete(id);
+                resolve(this.errResult(`Write to renderer failed: ${(err as Error).message}`));
+            }
         });
     }
 
     private async ensureProcess(): Promise<cp.ChildProcess | null> {
+        if (this._disposed) { return null; }
         if (this._proc) { return this._proc; }
 
         if (!fs.existsSync(this.rendererDll)) {
@@ -86,6 +123,7 @@ export class LiquidBackend {
 
         const dotnet = this.dotnetExe();
         const proc   = cp.spawn(dotnet, [this.rendererDll], { env: process.env });
+        this._disposing = false;
 
         proc.stdout!.on('data', (data: Buffer) => {
             this._lineBuffer += data.toString();
@@ -93,14 +131,28 @@ export class LiquidBackend {
             this._lineBuffer = lines.pop() ?? '';
             for (const ln of lines) {
                 if (!ln.trim()) { continue; }
+                let wire: WireResult | undefined;
                 try {
-                    const wire    = JSON.parse(ln) as WireResult;
-                    const resolve = this._pending.get(wire.id);
-                    if (resolve) {
-                        this._pending.delete(wire.id);
-                        resolve(wire);
+                    wire = JSON.parse(ln) as WireResult;
+                } catch {
+                    // Malformed line — extract the id via regex so we can fail
+                    // the specific request rather than leaving it hung forever.
+                    const idMatch = ln.match(/"id"\s*:\s*(\d+)/);
+                    if (idMatch) {
+                        const id      = parseInt(idMatch[1], 10);
+                        const resolve = this._pending.get(id);
+                        if (resolve) {
+                            this._pending.delete(id);
+                            resolve(this.errResult('Renderer returned malformed output.'));
+                        }
                     }
-                } catch { /* malformed line — ignore */ }
+                    continue;
+                }
+                const resolve = this._pending.get(wire.id);
+                if (resolve) {
+                    this._pending.delete(wire.id);
+                    resolve(wire);
+                }
             }
         });
 
@@ -110,13 +162,26 @@ export class LiquidBackend {
         });
 
         proc.on('exit', () => {
-            this._rejectAll('Renderer process exited unexpectedly. It will respawn on next render.');
+            const wasDisposing = this._disposing;
+            this._disposing = false;
+            if (!wasDisposing) {
+                this._rejectAll('Renderer process exited unexpectedly. It will respawn on next render.');
+            }
             this._proc = null;
         });
 
         proc.on('error', (err) => {
             this._rejectAll(`Failed to start renderer: ${err.message}`);
             this._proc = null;
+        });
+
+        // A broken pipe or premature close on stdin must reject in-flight requests
+        // rather than leaving them hung.  This fires if the child dies between
+        // ensureProcess() returning and the write completing.
+        proc.stdin!.on('error', () => {
+            // The 'exit' handler will also fire and call _rejectAll; this is
+            // a no-op if _pending is already empty, so duplicate calls are safe.
+            this._rejectAll('Renderer stdin closed unexpectedly.');
         });
 
         this._proc = proc;
@@ -146,21 +211,25 @@ export class LiquidBackend {
                 cancellable: false
             },
             () => new Promise<boolean>((resolve) => {
-                let buildStderr = '';
+                let buildOutput = '';
                 const proc = cp.spawn(
                     dotnet,
                     ['build', '-c', 'Release', '-o', outDir],
                     { cwd: this.projectDir, env: process.env }
                 );
-                proc.stdout!.on('data', (d: Buffer) => this._output.append(d.toString()));
+                proc.stdout!.on('data', (d: Buffer) => {
+                    const text = d.toString();
+                    this._output.append(text);
+                    buildOutput += text;
+                });
                 proc.stderr!.on('data', (d: Buffer) => {
                     const text = d.toString();
                     this._output.append(text);
-                    buildStderr += text;
+                    buildOutput += text;
                 });
                 proc.on('close', (code) => {
                     if (code !== 0) {
-                        const tail = buildStderr.trim().split('\n').slice(-5).join('\n');
+                        const tail = buildOutput.trim().split('\n').slice(-5).join('\n');
                         void vscode.window.showErrorMessage(
                             `DotLiquid Debugger: renderer build failed.\n${tail}\n\nFull output: DotLiquid Debugger output channel.`,
                             'Show Output'
@@ -198,13 +267,24 @@ export class LiquidBackend {
     private errResult(message: string): RenderResult {
         return {
             success: false, output: '', variables: [],
-            lineMappings: [], errors: [{ message }], renderTimeMs: 0
+            lineMappings: [], steps: [], errors: [{ message }], renderTimeMs: 0
         };
     }
 
     dispose(): void {
-        this._proc?.kill();
+        if (this._disposed) { return; }
+        this._disposed = true;
+
+        const proc = this._proc;
         this._proc = null;
+
+        if (proc) {
+            this._disposing = true;
+            this._rejectAll('Renderer process stopped.');
+            proc.kill();
+        } else {
+            this._rejectAll('Renderer process stopped.');
+        }
         this._output.dispose();
     }
 }

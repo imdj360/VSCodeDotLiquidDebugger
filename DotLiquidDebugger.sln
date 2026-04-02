@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "extension", "extension", "{A733E7E6-5D3C-A18F-63F2-F30E254156BD}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "backend", "backend", "{14B87414-DFC5-BFF8-4281-697BDE5E943A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotLiquidRenderer", "extension\backend\DotLiquidRenderer\DotLiquidRenderer.csproj", "{15E7CF0D-FB11-0E7E-00A4-C37103BAE991}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{15E7CF0D-FB11-0E7E-00A4-C37103BAE991}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15E7CF0D-FB11-0E7E-00A4-C37103BAE991}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15E7CF0D-FB11-0E7E-00A4-C37103BAE991}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15E7CF0D-FB11-0E7E-00A4-C37103BAE991}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{14B87414-DFC5-BFF8-4281-697BDE5E943A} = {A733E7E6-5D3C-A18F-63F2-F30E254156BD}
+		{15E7CF0D-FB11-0E7E-00A4-C37103BAE991} = {14B87414-DFC5-BFF8-4281-697BDE5E943A}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {544DB95C-01C7-4C5D-9207-88E1EE4416C5}
+	EndGlobalSection
+EndGlobal
