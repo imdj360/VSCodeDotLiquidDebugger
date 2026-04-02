@@ -1,17 +1,112 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Run Extension",
-            "type": "extensionHost",
-            "request": "launch",
-            "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}/extension"
-            ],
-            "outFiles": [
-                "${workspaceFolder}/extension/out/**/*.js"
-            ],
-            "preLaunchTask": "npm: compile - extension"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "${workspaceFolder}/docs"
+      ],
+      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+      "preLaunchTask": "npm: compile - extension"
+    },
+    {
+      "name": "Run Extension (watch)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "${workspaceFolder}/docs"
+      ],
+      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+      "preLaunchTask": "npm: watch - extension"
+    },
+
+    {
+      "name": "Sample: invoice-flat (JSON → JSON)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "${workspaceFolder}/docs/invoice-flat.liquid",
+        "--command", "dotliquid.openPreview"
+      ],
+      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+      "preLaunchTask": "npm: compile - extension"
+    },
+    {
+      "name": "Sample: sales-order-transform (JSON → JSON)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "${workspaceFolder}/docs/sales-order-transform.liquid",
+        "--command", "dotliquid.openPreview"
+      ],
+      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+      "preLaunchTask": "npm: compile - extension"
+    },
+    {
+      "name": "Sample: person-transform (JSON → JSON)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "${workspaceFolder}/docs/person-transform.liquid",
+        "--command", "dotliquid.openPreview"
+      ],
+      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+      "preLaunchTask": "npm: compile - extension"
+    },
+    {
+      "name": "Sample: order-to-xml (JSON → JSON)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "${workspaceFolder}/docs/order-to-xml.liquid",
+        "--command", "dotliquid.openPreview"
+      ],
+      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+      "preLaunchTask": "npm: compile - extension"
+    },
+    {
+      "name": "Sample: email-notification (JSON → HTML)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "${workspaceFolder}/docs/email-notification.liquid",
+        "--command", "dotliquid.openPreview"
+      ],
+      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+      "preLaunchTask": "npm: compile - extension"
+    },
+    {
+      "name": "Sample: customer-to-xml (JSON → XML)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "${workspaceFolder}/docs/customer-to-xml.liquid",
+        "--command", "dotliquid.openPreview"
+      ],
+      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+      "preLaunchTask": "npm: compile - extension"
+    },
+    {
+      "name": "Sample: shipping-label (JSON → plain text)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "${workspaceFolder}/docs/shipping-label.liquid",
+        "--command", "dotliquid.openPreview"
+      ],
+      "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+      "preLaunchTask": "npm: compile - extension"
+    }
+  ]
 }
