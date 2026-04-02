@@ -38,20 +38,22 @@ class DotLiquidDebugConfigurationProvider implements vscode.DebugConfigurationPr
             return undefined;
         }
 
-        // Resolve input path — auto-detect, then file picker
+        // Resolve input path — explicit config, then auto-detect, then file picker
         let inputPath = (config.input as string | undefined)?.replace('${workspaceFolder}', wsFolder);
         if (!inputPath) {
-            const autoInput = templatePath.replace(/\.liquid$/, '.liquid.json');
-            if (fs.existsSync(autoInput)) {
-                inputPath = autoInput;
-            } else {
-                const picked = await vscode.window.showOpenDialog({
-                    canSelectMany: false,
-                    filters: { 'JSON Files': ['json'] },
-                    title: `Select input JSON for ${path.basename(templatePath)}`
-                });
-                inputPath = picked?.[0]?.fsPath;
-            }
+            const candidates = [
+                templatePath.replace(/\.liquid$/, '.liquid.json'),
+                templatePath.replace(/\.liquid$/, '.json')
+            ];
+            inputPath = candidates.find(p => fs.existsSync(p));
+        }
+        if (!inputPath) {
+            const picked = await vscode.window.showOpenDialog({
+                canSelectMany: false,
+                filters: { 'JSON Files': ['json'] },
+                title: `Select input JSON for ${path.basename(templatePath)}`
+            });
+            inputPath = picked?.[0]?.fsPath;
         }
 
         // Open template in editor then open/reuse preview panel

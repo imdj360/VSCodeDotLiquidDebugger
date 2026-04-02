@@ -32,7 +32,7 @@ The extension builds the renderer once on first use. Subsequent renders reuse th
 ## Features
 
 | Feature | Details |
-|---------|---------|
+| ------- | ------- |
 | **Live preview** | Side-by-side output panel, auto-refreshes on save or keystroke (debounced) |
 | **Step debugger** | Replay-based line-by-line debugger over `assign`, `for`, `if/elsif/else/unless`, and output steps |
 | **Filter chain tracing** | Each `assign` step shows the full filter chain (e.g. `499.9 \| Times:5 → 2499.5 \| DividedBy:100 → 24.995`) |
@@ -58,7 +58,7 @@ code --install-extension danieljonathan.dotliquid-debugger
 
 ### Install from VSIX
 
-1. Download `dotliquid-debugger-0.2.0.vsix`
+1. Download `dotliquid-debugger-0.3.0.vsix`
 2. In VS Code open **Extensions** (`Ctrl+Shift+X`)
 3. Click `...` → **Install from VSIX…**
 
@@ -105,7 +105,7 @@ Press the **Debug** button in the preview panel toolbar (or `F5`) to enter step-
 ## Settings
 
 | Setting | Default | Description |
-|---------|---------|-------------|
+| ------- | ------- | ----------- |
 | `dotliquid.dotnetPath` | `dotnet` | Path to the .NET executable. Set this if `dotnet` is not on your PATH. |
 | `dotliquid.autoRefresh` | `true` | Re-render automatically on file save or text change |
 | `dotliquid.refreshDebounceMs` | `500` | Debounce delay in milliseconds before auto-refresh triggers |

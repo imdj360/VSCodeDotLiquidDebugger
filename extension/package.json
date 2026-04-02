@@ -2,7 +2,7 @@
   "name": "dotliquid-debugger",
   "displayName": "DotLiquid Debugger for Logic Apps",
   "description": "Live preview, variable inspection and line mapping for DotLiquid Liquid templates — Azure Logic Apps Standard (Transform JSON to JSON). The only DotLiquid-native Liquid extension on the marketplace.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "danieljonathan",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Debuggers", "Other"],
@@ -41,7 +41,7 @@
               },
               "input": {
                 "type": "string",
-                "description": "Path to the JSON input file. Auto-detected as <template>.liquid.json if omitted."
+                "description": "Path to any JSON input file. Auto-detected as <template>.liquid.json or <template>.json if omitted; falls back to a file picker."
               }
             }
           }
