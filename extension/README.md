@@ -53,12 +53,12 @@ The extension builds the renderer once on first use. Subsequent renders reuse th
 Search for **DotLiquid Debugger** in the VS Code Extensions panel, or install from the command line:
 
 ```bash
-code --install-extension danieljonathan.dotliquid-debugger
+code --install-extension danieljonathan.dotliquid-template-debugger
 ```
 
 ### Install from VSIX
 
-1. Download `dotliquid-debugger-0.3.0.vsix`
+1. Download `dotliquid-template-debugger-0.6.0.vsix`
 2. In VS Code open **Extensions** (`Ctrl+Shift+X`)
 3. Click `...` → **Install from VSIX…**
 

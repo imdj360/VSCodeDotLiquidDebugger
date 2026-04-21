@@ -9,14 +9,17 @@ export class PreviewPanel {
     private readonly panel: vscode.WebviewPanel;
     private disposables: vscode.Disposable[] = [];
     private liquidUri: vscode.Uri;
+    private inputUri: vscode.Uri | undefined;
     private decorationType: vscode.TextEditorDecorationType;
 
     private constructor(
         private context: vscode.ExtensionContext,
         private backend: LiquidBackend,
-        liquidUri: vscode.Uri
+        liquidUri: vscode.Uri,
+        inputUri?: vscode.Uri
     ) {
         this.liquidUri = liquidUri;
+        this.inputUri = inputUri;
 
         this.panel = vscode.window.createWebviewPanel(
             'dotliquidPreview',
@@ -76,20 +79,21 @@ export class PreviewPanel {
     public static createOrShow(
         context: vscode.ExtensionContext,
         backend: LiquidBackend,
-        liquidUri: vscode.Uri
+        liquidUri: vscode.Uri,
+        inputUri?: vscode.Uri
     ): PreviewPanel | undefined {
         if (PreviewPanel.currentPanel) {
             PreviewPanel.currentPanel.panel.reveal(vscode.ViewColumn.Beside);
             PreviewPanel.currentPanel.liquidUri = liquidUri;
+            PreviewPanel.currentPanel.inputUri = inputUri;
             PreviewPanel.currentPanel.panel.title =
                 `DotLiquid: ${path.basename(liquidUri.fsPath)}`;
-            // liquidUri is already updated; call run() directly without a timer.
             void PreviewPanel.currentPanel.run();
             return PreviewPanel.currentPanel;
         }
 
         try {
-            PreviewPanel.currentPanel = new PreviewPanel(context, backend, liquidUri);
+            PreviewPanel.currentPanel = new PreviewPanel(context, backend, liquidUri, inputUri);
         } catch {
             // Error already shown to user by the constructor
             return undefined;
@@ -97,10 +101,10 @@ export class PreviewPanel {
         return PreviewPanel.currentPanel;
     }
 
-    /** Returns true if fileName is either the tracked .liquid template or its paired .liquid.json input. */
+    /** Returns true if fileName is either the tracked .liquid template or its paired input. */
     public isTrackedFile(fileName: string): boolean {
         const liquidPath = this.liquidUri.fsPath;
-        const inputPath  = liquidPath.replace(/\.liquid$/, '.liquid.json');
+        const inputPath  = this.inputUri?.fsPath ?? liquidPath.replace(/\.liquid$/, '.liquid.json');
         return fileName === liquidPath || fileName === inputPath;
     }
 
@@ -126,8 +130,8 @@ export class PreviewPanel {
             return;
         }
 
-        // Paired input file: <name>.liquid.json
-        const inputPath = liquidPath.replace(/\.liquid$/, '.liquid.json');
+        // Paired input file: explicit override, then <name>.liquid.json convention
+        const inputPath = this.inputUri?.fsPath ?? liquidPath.replace(/\.liquid$/, '.liquid.json');
         let inputJson = '{}';
         let inputFileExists = false;
 

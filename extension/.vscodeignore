@@ -2,7 +2,11 @@
 .vscode/**
 src/**
 test/**
+out/test/**
 tsconfig.json
+tsconfig.test.json
+.vscode-test.mjs
+.vscode-test/**
 .vscodeignore
 icon.svg
 

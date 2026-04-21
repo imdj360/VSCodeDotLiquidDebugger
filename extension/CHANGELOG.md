@@ -4,6 +4,28 @@ All notable changes are documented here. Format follows [Keep a Changelog](https
 
 ---
 
+## [0.6.0] — 2026-04-21
+
+### Fixed
+
+- **Preview panel could not be reopened after closing** — closing the panel left a stale reference in the extension host, so subsequent F5 / `Open Preview` calls were silently no-ops until the Extension Development Host was reloaded. `PreviewPanel.currentPanel` is now the single source of truth; the redundant module-level reference that caused the stale state has been removed.
+- **File picker result was discarded when no input JSON was found** — when launching via F5 with no paired `.liquid.json`, the file picker dialog appeared but the selected file was never passed to the preview panel. The panel always fell back to the `.liquid.json` convention regardless. The picked path is now forwarded correctly and used for both rendering and auto-refresh tracking.
+
+---
+
+## [0.5.0] — 2026-04-03
+
+### Added
+
+- Extension metadata for publishing: repository URL and bundled MIT license.
+
+### Changed
+
+- Packaging/docs alignment for local-first workflow messaging (run locally on each change, then validate in Logic Apps).
+- Marketplace-first install guidance for `danieljonathan.dotliquid-template-debugger`, with VSIX install as fallback.
+
+---
+
 ## [0.3.0] — 2026-04-03
 
 ### Added

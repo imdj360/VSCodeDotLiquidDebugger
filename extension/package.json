@@ -1,8 +1,13 @@
 {
-  "name": "dotliquid-debugger",
-  "displayName": "DotLiquid Debugger for Logic Apps",
+  "name": "dotliquid-template-debugger",
+  "displayName": "DotLiquid Template Debugger for Logic Apps",
   "description": "Live preview, variable inspection and line mapping for DotLiquid Liquid templates — Azure Logic Apps Standard (Transform JSON to JSON). The only DotLiquid-native Liquid extension on the marketplace.",
-  "version": "0.3.0",
+  "version": "0.6.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imdj360/VSCodeDotLiquidDebugger.git"
+  },
   "publisher": "danieljonathan",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Debuggers", "Other"],
@@ -160,12 +165,16 @@
     "package": "vsce package",
     "build-renderer": "dotnet build backend/DotLiquidRenderer/DotLiquidRenderer.csproj -c Release -o backend/renderer",
     "test:csharp": "dotnet test backend/DotLiquidRenderer.Tests/DotLiquidRenderer.Tests.csproj -c Release",
-    "test": "npm run compile && npm run test:csharp && npm run build-renderer && node --test test/*.test.mjs"
+    "test": "npm run compile && npm run test:csharp && npm run build-renderer && node --test test/*.test.mjs",
+    "test:integration": "npm run compile && tsc -p tsconfig.test.json && npm run build-renderer && vscode-test"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.0",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
-    "typescript": "^5.3.0",
-    "@vscode/vsce": "^2.22.0"
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0"
   }
 }

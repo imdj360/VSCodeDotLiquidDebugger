@@ -4,8 +4,12 @@ dist/
 *.vsix
 .claude/
 extension/backend/renderer/
+extension/.vscode-test/
+extension/test/**/*.js
+extension/test/**/*.map
 # .NET build outputs for all backend projects (renderer + test project)
 extension/backend/**/bin/
 extension/backend/**/obj/
 extension/backend/**/TestResults/
 .DS_Store
+**/blog/*

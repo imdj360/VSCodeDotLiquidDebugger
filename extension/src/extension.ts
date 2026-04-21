@@ -5,7 +5,10 @@ import { LiquidBackend } from './backend';
 import { PreviewPanel } from './previewPanel';
 
 let backend: LiquidBackend | undefined;
-let previewPanel: PreviewPanel | undefined;
+
+// Exported for integration tests — not part of the public API.
+export let extensionContext: vscode.ExtensionContext | undefined;
+export let extensionBackend: LiquidBackend | undefined;
 
 class DotLiquidDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
     constructor(private readonly context: vscode.ExtensionContext) {}
@@ -59,7 +62,12 @@ class DotLiquidDebugConfigurationProvider implements vscode.DebugConfigurationPr
         // Open template in editor then open/reuse preview panel
         const doc = await vscode.workspace.openTextDocument(templatePath);
         await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
-        previewPanel = PreviewPanel.createOrShow(this.context, backend!, vscode.Uri.file(templatePath));
+        PreviewPanel.createOrShow(
+            this.context,
+            backend!,
+            vscode.Uri.file(templatePath),
+            inputPath ? vscode.Uri.file(inputPath) : undefined
+        );
 
         // Return undefined — cancels the debug session (no real adapter needed)
         return undefined;
@@ -70,6 +78,8 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('DotLiquid Debugger activating...');
 
     backend = new LiquidBackend(context);
+    extensionContext = context;
+    extensionBackend = backend;
 
     // Command: Open Preview Panel
     const openPreview = vscode.commands.registerCommand('dotliquid.openPreview', () => {
@@ -78,7 +88,7 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showWarningMessage('Open a .liquid file first.');
             return;
         }
-        previewPanel = PreviewPanel.createOrShow(context, backend!, editor.document.uri);
+        PreviewPanel.createOrShow(context, backend!, editor.document.uri);
     });
 
     // Command: Run Template (F5)
@@ -88,11 +98,11 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showWarningMessage('Open a .liquid file first.');
             return;
         }
-        if (!previewPanel) {
-            previewPanel = PreviewPanel.createOrShow(context, backend!, editor.document.uri);
+        if (!PreviewPanel.currentPanel) {
+            PreviewPanel.createOrShow(context, backend!, editor.document.uri);
         }
-        if (!previewPanel) { return; } // panel creation failed (e.g. missing media/preview.html)
-        await previewPanel.run();
+        if (!PreviewPanel.currentPanel) { return; }
+        await PreviewPanel.currentPanel.run();
     });
 
     // Command: Create paired input JSON
@@ -135,10 +145,10 @@ export function activate(context: vscode.ExtensionContext) {
     const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
         const cfg = vscode.workspace.getConfiguration('dotliquid');
         if (!cfg.get<boolean>('autoRefresh', true)) return;
-        if (!previewPanel) return;
+        if (!PreviewPanel.currentPanel) return;
 
-        if (previewPanel.isTrackedFile(doc.fileName)) {
-            await previewPanel.run();
+        if (PreviewPanel.currentPanel.isTrackedFile(doc.fileName)) {
+            await PreviewPanel.currentPanel.run();
         }
     });
 
@@ -147,13 +157,13 @@ export function activate(context: vscode.ExtensionContext) {
     const onTextChange = vscode.workspace.onDidChangeTextDocument((event) => {
         const cfg = vscode.workspace.getConfiguration('dotliquid');
         if (!cfg.get<boolean>('autoRefresh', true)) return;
-        if (!previewPanel) return;
+        if (!PreviewPanel.currentPanel) return;
 
-        if (previewPanel.isTrackedFile(event.document.fileName)) {
+        if (PreviewPanel.currentPanel.isTrackedFile(event.document.fileName)) {
             const delay = cfg.get<number>('refreshDebounceMs', 500);
             if (debounceTimer) clearTimeout(debounceTimer);
             debounceTimer = setTimeout(async () => {
-                if (previewPanel) await previewPanel.run();
+                if (PreviewPanel.currentPanel) await PreviewPanel.currentPanel.run();
             }, delay);
         }
     });
